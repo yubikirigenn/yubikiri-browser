@@ -7,7 +7,7 @@
     body { font-family: sans-serif; margin: 20px; }
     input { width: 80%; padding: 8px; }
     button { padding: 8px 12px; }
-    iframe { width: 100%; height: 80vh; margin-top: 20px; border: 1px solid #ccc; }
+    iframe { width: 100%; height: 90vh; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -27,6 +27,7 @@
       e.preventDefault();
       let url = input.value.trim();
       if (!url.startsWith("http")) url = "http://" + url;
+      // 1ページだけ表示
       frame.src = "/proxy?url=" + encodeURIComponent(url);
     });
   </script>
