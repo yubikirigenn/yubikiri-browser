@@ -1,36 +1,23 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Yubikiri Browser</title>
-</head>
-<body>
-<h1>Yubikiri Browser</h1>
-<form id="proxyForm">
-  <input type="text" id="url" placeholder="URLを入力">
+<form id="searchForm">
+  <input type="text" id="query" placeholder="URL または 検索ワードを入力" />
   <button type="submit">Go</button>
 </form>
-<div id="result" style="width:100%; min-height:600px; border:1px solid #ccc; padding:10px;"></div>
 
 <script>
-const form = document.getElementById('proxyForm');
-const result = document.getElementById('result');
+  const form = document.getElementById("searchForm");
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const query = document.getElementById("query").value.trim();
+    if (!query) return;
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const url = encodeURIComponent(document.getElementById('url').value);
+    let finalUrl;
+    const urlPattern = /^https?:\/\/|^[\w-]+\.[a-z]{2,}$/i;
+    if (urlPattern.test(query)) {
+      finalUrl = query.startsWith("http") ? query : `http://${query}`;
+    } else {
+      finalUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+    }
 
-  result.innerHTML = "読み込み中…";
-
-  try {
-    const res = await fetch(`/proxy?url=${url}`);
-    const html = await res.text();
-    result.innerHTML = html;
-  } catch (err) {
-    result.innerHTML = "読み込みに失敗しました";
-  }
-});
+    window.location.href = `/proxy?url=${encodeURIComponent(finalUrl)}`;
+  });
 </script>
-</body>
-</html>
