@@ -1,59 +1,71 @@
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
-import fs from 'fs';
-import path from 'path';
 import querystring from 'querystring';
 
 const PORT = process.env.PORT || 10000;
 
-// HTML 読み込み
-const indexHtml = fs.readFileSync(path.join('views', 'index.html'), 'utf8');
+const requestHandler = (req, res) => {
+  if (req.url.startsWith('/proxy')) {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const target = parsedUrl.searchParams.get('url');
 
-const server = http.createServer((req, res) => {
-  if (req.method === 'GET' && req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(indexHtml);
+    if (!target) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('Not found: url parameter is missing');
+      return;
+    }
 
-  } else if (req.method === 'POST' && req.url === '/proxy') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      const params = querystring.parse(body);
-      let targetUrl = params.url;
+    let targetUrl;
+    try {
+      targetUrl = new URL(target);
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('Not found: invalid URL');
+      return;
+    }
 
-      // URLか検索語句か判定
-      if (!/^https?:\/\//.test(targetUrl)) {
-        targetUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(targetUrl);
+    const lib = targetUrl.protocol === 'https:' ? https : http;
+
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) YubikiriBrowser',
+        'Accept': '*/*',
       }
+    };
 
-      try {
-        const urlObj = new URL(targetUrl);
-        const lib = urlObj.protocol === 'https:' ? https : http;
-
-        lib.get(urlObj, (proxyRes) => {
-          let data = '';
-          proxyRes.on('data', chunk => data += chunk);
-          proxyRes.on('end', () => {
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(data);
-          });
-        }).on('error', err => {
-          res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(`<p style="color:red;">エラー: ${err.message}</p>`);
-        });
-
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(`<p style="color:red;">不正なURLです</p>`);
-      }
+    lib.get(targetUrl, options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    }).on('error', (err) => {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error fetching URL: ' + err.message);
     });
 
-  } else {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('not found');
+    return;
   }
-});
+
+  // それ以外は index.html を返す
+  if (req.url === '/' || req.url === '/index.html') {
+    import('fs').then(fs => {
+      fs.readFile('./views/index.html', 'utf8', (err, data) => {
+        if (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('Error loading index.html');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(data);
+      });
+    });
+    return;
+  }
+
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
+  res.end('Not found');
+};
+
+const server = http.createServer(requestHandler);
 
 server.listen(PORT, () => {
   console.log(`Yubikiri Browser running on port ${PORT}`);
