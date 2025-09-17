@@ -2,55 +2,79 @@ import express from "express";
 import fetch from "node-fetch";
 import cookieParser from "cookie-parser";
 import compression from "compression";
-import * as cheerio from "cheerio";
+import path from "path";
+import { fileURLToPath } from "url";
+import { JSDOM } from "jsdom"; // DOM操作用
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(cookieParser());
+// ミドルウェア
 app.use(compression());
-app.use(express.static("public")); // /public 配下の静的ファイルを提供
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
 
-// ルートページ
+// トップページ
 app.get("/", (req, res) => {
-  res.sendFile(new URL("./views/index.html", import.meta.url));
+  res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
 // プロキシ処理
-app.post("/proxy", async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).send("URL required");
-
+app.all("/proxy", async (req, res) => {
   try {
-    // 制限回避用にヘッダを偽装
-    const response = await fetch(url, {
+    const targetUrl = req.query.url || req.body.url;
+    if (!targetUrl) return res.status(400).send("URLが指定されていません");
+
+    // GET も POST も対応
+    const method = req.method;
+    const options = {
+      method,
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": url,
+        "User-Agent": req.headers["user-agent"] || "",
+        "Accept": "*/*",
       },
-      redirect: "follow",
-    });
+    };
 
-    let text = await response.text();
+    if (method === "POST") options.body = JSON.stringify(req.body);
 
-    // cheerioでHTML操作（リンクの書き換えなど）
-    const $ = cheerio.load(text);
-    $("a").each((i, el) => {
-      const href = $(el).attr("href");
-      if (href && !href.startsWith("http")) {
-        $(el).attr("href", url + href); // 相対リンクを絶対リンクに変換
-      }
-    });
-    text = $.html();
+    const response = await fetch(targetUrl, options);
 
-    res.send(text);
+    let contentType = response.headers.get("content-type") || "";
+
+    // HTMLなら簡易置換してリンクを書き換える
+    if (contentType.includes("text/html")) {
+      let html = await response.text();
+
+      // 制限回避簡易処理：baseタグを修正
+      const dom = new JSDOM(html);
+      const document = dom.window.document;
+
+      // すべてのリンクを /proxy?url= に書き換え
+      document.querySelectorAll("a").forEach(a => {
+        const href = a.getAttribute("href");
+        if (href && !href.startsWith("#") && !href.startsWith("mailto:")) {
+          try {
+            const newUrl = new URL(href, targetUrl).href;
+            a.setAttribute("href", `/proxy?url=${encodeURIComponent(newUrl)}`);
+          } catch(e) {}
+        }
+      });
+
+      html = dom.serialize();
+      res.send(html);
+    } else {
+      // HTML以外はそのまま返す
+      response.body.pipe(res);
+    }
+
   } catch (err) {
     console.error(err);
-    res.status(500).send("Error fetching URL");
+    res.status(500).send("プロキシ処理中にエラーが発生しました");
   }
 });
 
