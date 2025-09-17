@@ -5,10 +5,29 @@
   <title>Yubikiri Browser</title>
 </head>
 <body>
-  <h1>Yubikiri Proxy</h1>
-  <form method="POST" action="/proxy">
-    <input type="text" name="url" placeholder="URLを入力" size="50" required>
-    <button type="submit">GO</button>
+  <h1>Yubikiri Browser</h1>
+  <form id="proxyForm">
+    <input type="text" id="url" placeholder="URLを入力" size="50">
+    <button type="submit">Go</button>
   </form>
+  <iframe id="result" style="width:100%; height:80vh;"></iframe>
+
+  <script>
+    const form = document.getElementById("proxyForm");
+    const iframe = document.getElementById("result");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const url = document.getElementById("url").value;
+      const res = await fetch("/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html" });
+      iframe.src = URL.createObjectURL(blob);
+    });
+  </script>
 </body>
 </html>
