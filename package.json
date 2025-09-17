@@ -1,15 +1,22 @@
 {
   "name": "yubikiri-browser",
   "version": "1.0.0",
+  "description": "A web proxy browser",
   "type": "module",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "node-fetch": "^3.4.2",
+    "node-fetch": "^3.3.2",
     "cookie-parser": "^1.4.6",
     "compression": "^1.7.4",
     "cheerio": "^1.0.0-rc.12"
-  }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "author": "yubikirigenn",
+  "license": "MIT"
 }
