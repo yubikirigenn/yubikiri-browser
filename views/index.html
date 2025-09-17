@@ -1,17 +1,14 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>Yubikiri Browser</title>
-<link rel="stylesheet" href="/style.css">
-<script src="/script.js" defer></script>
+  <meta charset="UTF-8">
+  <title>Yubikiri Browser</title>
 </head>
 <body>
-<h1>Yubikiri Browser</h1>
-<form id="proxyForm" method="post" action="/proxy" target="proxyFrame">
-  <input type="url" name="url" placeholder="URLを入力" required>
-  <button type="submit">GO</button>
-</form>
-<iframe name="proxyFrame" width="100%" height="800px"></iframe>
+  <h1>Yubikiri Proxy</h1>
+  <form method="POST" action="/proxy">
+    <input type="text" name="url" placeholder="URLを入力" size="50" required>
+    <button type="submit">GO</button>
+  </form>
 </body>
 </html>
