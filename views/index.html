@@ -5,55 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Yubikiri Browser</title>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 20px;
-      background-color: #f5f5f5;
-    }
-    form {
-      margin-bottom: 20px;
-    }
-    input[type="text"] {
-      width: 300px;
-      padding: 8px;
-    }
-    button {
-      padding: 8px 12px;
-    }
-    iframe {
-      width: 100%;
-      height: 80vh;
-      border: 1px solid #ccc;
-    }
+    body { font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+    form { display: flex; padding: 10px; background: #f0f0f0; }
+    input[type="text"] { flex: 1; padding: 5px; font-size: 1em; }
+    button { padding: 5px 10px; font-size: 1em; margin-left: 5px; }
+    iframe { flex: 1; border: none; width: 100%; }
   </style>
 </head>
 <body>
-  <h1>Yubikiri Browser</h1>
-
-  <!-- URL入力フォーム -->
-  <form id="urlForm">
-    <input type="text" id="urlInput" placeholder="URLまたは検索語句を入力" required>
-    <button type="submit">開く</button>
+  <form id="proxyForm">
+    <input type="text" name="url" id="urlInput" placeholder="URLまたは検索語句を入力">
+    <button type="submit">Go</button>
   </form>
-
-  <!-- プレビュー用iframe -->
-  <iframe id="preview" src=""></iframe>
+  <iframe id="resultFrame"></iframe>
 
   <script>
-    const form = document.getElementById("urlForm");
-    const input = document.getElementById("urlInput");
-    const iframe = document.getElementById("preview");
+    const form = document.getElementById("proxyForm");
+    const iframe = document.getElementById("resultFrame");
 
-    form.addEventListener("submit", e => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      let value = input.value.trim();
+      const url = document.getElementById("urlInput").value.trim();
+      if (!url) return;
 
-      // URLか検索語句か判定
-      if (!/^https?:\/\//i.test(value)) {
-        // URLでなければDuckDuckGoで検索
-        iframe.src = `/search?q=${encodeURIComponent(value)}`;
-      } else {
-        iframe.src = `/proxy?url=${encodeURIComponent(value)}`;
+      // フォーム送信は fetchで行い、iframeに表示
+      try {
+        const formData = new URLSearchParams();
+        formData.append("url", url);
+
+        // iframe srcにプロキシURLを直接指定する方法もあります
+        // サーバー経由で処理する場合はFetchで取得して表示
+        iframe.src = `/proxy`;
+        await fetch("/proxy", { method: "POST", body: formData });
+      } catch (err) {
+        iframe.srcdoc = `<p>Error: ${err.message}</p>`;
       }
     });
   </script>
