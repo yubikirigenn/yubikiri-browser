@@ -1,52 +1,46 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>Yubikiri Browser</title>
-<style>
-  body { font-family: sans-serif; margin: 0; padding: 0; }
-  header { background: #222; color: white; padding: 1em; text-align: center; }
-  main { padding: 1em; }
-  input[type=text] { width: 70%; padding: 0.5em; font-size: 1em; }
-  button { padding: 0.5em 1em; font-size: 1em; }
-  iframe { width: 100%; height: 80vh; border: none; margin-top: 1em; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yubikiri Browser</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    input[type="text"] { width: 70%; padding: 5px; }
+    button { padding: 5px 10px; }
+    iframe { width: 100%; height: 80vh; margin-top: 20px; border: 1px solid #ccc; }
+  </style>
 </head>
 <body>
-<header>
   <h1>Yubikiri Browser</h1>
-</header>
-<main>
-  <form id="proxyForm">
-    <input type="text" id="urlInput" placeholder="URLまたは検索語句を入力">
-    <button type="submit">表示</button>
+  <form id="searchForm">
+    <input type="text" id="urlInput" name="url" placeholder="URL または検索語句">
+    <button type="submit">GO</button>
   </form>
-  <iframe id="proxyFrame"></iframe>
-</main>
+  <iframe id="proxyFrame" src=""></iframe>
 
-<script>
-  const form = document.getElementById('proxyForm');
-  const input = document.getElementById('urlInput');
-  const frame = document.getElementById('proxyFrame');
+  <script>
+    const form = document.getElementById('searchForm');
+    const input = document.getElementById('urlInput');
+    const iframe = document.getElementById('proxyFrame');
 
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const value = input.value.trim();
-    if (!value) return;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      let value = input.value.trim();
+      if (!value) return;
 
-    fetch('/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'url=' + encodeURIComponent(value)
-    })
-    .then(resp => resp.text())
-    .then(html => {
-      frame.srcdoc = html;
-    })
-    .catch(err => {
-      frame.srcdoc = `<p style="color:red;">エラー: ${err.message}</p>`;
+      // URLか検索語句か判定
+      let url;
+      try {
+        url = new URL(value); // 正しいURLならそのまま
+      } catch {
+        // URLでなければDuckDuckGoで検索
+        url = new URL('https://duckduckgo.com/?q=' + encodeURIComponent(value));
+      }
+
+      // サーバーの /proxy にクエリとして送る
+      iframe.src = '/proxy?url=' + encodeURIComponent(url.toString());
     });
-  });
-</script>
+  </script>
 </body>
 </html>
