@@ -2,23 +2,68 @@ import express from "express";
 import fetch from "node-fetch";
 import cookieParser from "cookie-parser";
 import compression from "compression";
-import * as cheerio from "cheerio"; // ←ここを修正
 
 const app = express();
-const PORT = process.env.PORT || 10000;
-
 app.use(cookieParser());
 app.use(compression());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static("public")); // /public フォルダの静的ファイルを配信
 
-// フォーム
+function rewriteHtml(html, baseUrl) {
+  // リンク・画像・スクリプト・スタイル・iframe・動画などのURLを書き換え
+  return html
+    .replace(/(href|src|action|data-[^=]+)=["'](.*?)["']/g, (m, attr, url) => {
+      if (!url.startsWith("http") && !url.startsWith("//")) return m;
+      const fullUrl = url.startsWith("//") ? "https:" + url : url;
+      return `${attr}="/proxy?url=${encodeURIComponent(fullUrl)}"`;
+    })
+    .replace(/url\((['"]?)(.*?)\1\)/g, (m, quote, url) => {
+      if (!url.startsWith("http") && !url.startsWith("//")) return m;
+      const fullUrl = url.startsWith("//") ? "https:" + url : url;
+      return `url(${quote}/proxy?url=${encodeURIComponent(fullUrl)}${quote})`;
+    })
+    .replace(/fetch\((['"`])(.*?)\1/g, (m, quote, url) => {
+      if (!url.startsWith("http") && !url.startsWith("//")) return m;
+      const fullUrl = url.startsWith("//") ? "https:" + url : url;
+      return `fetch("/proxy?url=${encodeURIComponent(fullUrl)}`;
+    });
+}
+
+app.get("/proxy", async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl) return res.status(400).send("URL required");
+
+  try {
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0",
+        "Referer": targetUrl,
+        "Origin": targetUrl,
+      },
+    });
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("text/html")) {
+      let body = await response.text();
+      body = rewriteHtml(body, targetUrl);
+      res.send(body);
+    } else {
+      response.body.pipe(res);
+    }
+  } catch (err) {
+    res.status(500).send("Fetch error: " + err.message);
+  }
+});
+
 app.get("/", (req, res) => {
   res.send(`
     <html>
       <head>
         <title>Yubikiri Browser</title>
+        <style>
+          body { font-family: sans-serif; margin: 50px; }
+          input { width: 300px; padding: 5px; }
+          button { padding: 5px 10px; }
+        </style>
       </head>
       <body>
         <h1>Yubikiri Browser</h1>
@@ -31,7 +76,7 @@ app.get("/", (req, res) => {
           form.addEventListener("submit", e => {
             e.preventDefault();
             const url = document.getElementById("urlInput").value;
-            window.location.href = '/fetch?url=' + encodeURIComponent(url);
+            window.location.href = '/proxy?url=' + encodeURIComponent(url);
           });
           document.getElementById("urlInput").addEventListener("keydown", e => {
             if(e.key === "Enter") form.dispatchEvent(new Event("submit", {cancelable: true}));
@@ -42,47 +87,6 @@ app.get("/", (req, res) => {
   `);
 });
 
-// プロキシ
-app.get("/fetch", async (req, res) => {
-  const targetUrl = req.query.url;
-  if (!targetUrl) return res.status(400).send("URL required");
-
-  try {
-    const response = await fetch(targetUrl, { redirect: "follow" });
-    let body = await response.text();
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("text/html")) {
-      const $ = cheerio.load(body);
-
-      $("meta[http-equiv]").each((i, el) => {
-        const httpEquiv = $(el).attr("http-equiv")?.toLowerCase();
-        if (httpEquiv === "content-security-policy" || httpEquiv === "x-frame-options") {
-          $(el).remove();
-        }
-      });
-
-      $("a, link, script, img, form").each((i, el) => {
-        const attr = el.name === "form" ? "action" : el.name === "a" ? "href" : "src";
-        const val = $(el).attr(attr);
-        if (val && !val.startsWith("http") && !val.startsWith("data:")) {
-          const newUrl = new URL(val, targetUrl).toString();
-          $(el).attr(attr, `/fetch?url=${encodeURIComponent(newUrl)}`);
-        }
-      });
-
-      body = $.html();
-    }
-
-    res.set("Content-Type", contentType);
-    res.send(body);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching URL");
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Yubikiri Browser running on port ${PORT}`);
+app.listen(10000, () => {
+  console.log("Yubikiri Browser running on port 10000");
 });
