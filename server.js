@@ -1,58 +1,61 @@
-// server.js
-import express from "express";
-import fetch from "node-fetch";
-import cookieParser from "cookie-parser";
-import compression from "compression";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import compression from 'compression';
+import puppeteer from 'puppeteer';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// ミドルウェア
-app.use(express.urlencoded({ extended: true })); // POSTフォーム用
-app.use(express.json());
 app.use(cookieParser());
 app.use(compression());
-app.use(express.static(path.join(__dirname, "public"))); // /public 配下の静的ファイル配信
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.static('public'));
 
-// HTML を返すフォームページ
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views/index.html"));
+// トップページ
+app.get('/', (req, res) => {
+  res.sendFile(`${process.cwd()}/views/index.html`);
 });
 
-// プロキシ処理関数
-const proxyHandler = async (req, res) => {
-  const targetUrl = req.query.url || req.body.url;
-  if (!targetUrl) return res.status(400).send("URLを入力してください");
+// Proxy
+app.post('/proxy', async (req, res) => {
+  const targetUrl = req.body.url;
+  if (!targetUrl) return res.status(400).send('URL is required');
 
   try {
-    const response = await fetch(targetUrl, { redirect: "follow" });
-    let contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("text/html")) {
-      let text = await response.text();
-      // 制限回避やURL書き換えなどの簡易処理
-      text = text.replace(/https?:\/\/[^ "]+/g, (match) => `/proxy?url=${encodeURIComponent(match)}`);
-      res.send(text);
-    } else {
-      // HTML 以外はそのまま
-      const buffer = await response.arrayBuffer();
-      res.set("Content-Type", contentType || "application/octet-stream");
-      res.send(Buffer.from(buffer));
-    }
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+
+    // Cookie保持
+    const cookies = req.cookies.pbc || [];
+    if (cookies.length) await page.setCookie(...cookies);
+
+    // JS-heavyサイト対応
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+    // ページ内の動的要素や制限回避
+    await page.addScriptTag({ content: `
+      // 必要に応じて CSP・広告ブロック回避などの処理
+      console.log('Yubikiri Browser active');
+    `});
+
+    // Cookie更新
+    const newCookies = await page.cookies();
+    res.cookie('pbc', newCookies, { httpOnly: true });
+
+    // HTML取得
+    const content = await page.content();
+    await browser.close();
+    res.send(content);
   } catch (err) {
     console.error(err);
-    res.status(500).send("プロキシでエラーが発生しました");
+    res.status(500).send('Error loading page');
   }
-};
-
-// GET /proxy と POST /proxy の両対応
-app.get("/proxy", proxyHandler);
-app.post("/proxy", proxyHandler);
+});
 
 app.listen(PORT, () => {
-  console.log(`yubikiri-browser running on port ${PORT}`);
+  console.log(`Yubikiri Browser running on port ${PORT}`);
 });
