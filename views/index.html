@@ -1,23 +1,16 @@
-<form id="searchForm">
-  <input type="text" id="query" placeholder="URL または 検索ワードを入力" />
-  <button type="submit">Go</button>
-</form>
-
-<script>
-  const form = document.getElementById("searchForm");
-  form.addEventListener("submit", e => {
-    e.preventDefault();
-    const query = document.getElementById("query").value.trim();
-    if (!query) return;
-
-    let finalUrl;
-    const urlPattern = /^https?:\/\/|^[\w-]+\.[a-z]{2,}$/i;
-    if (urlPattern.test(query)) {
-      finalUrl = query.startsWith("http") ? query : `http://${query}`;
-    } else {
-      finalUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
-    }
-
-    window.location.href = `/proxy?url=${encodeURIComponent(finalUrl)}`;
-  });
-</script>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Yubikiri Browser</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Yubikiri Browser</h1>
+  <form method="GET" action="/proxy">
+    <input type="text" name="url" placeholder="URL または 検索語句" style="width:300px">
+    <button type="submit">Go</button>
+  </form>
+  <p>URLを入力するか、検索語句を入力してください。</p>
+</body>
+</html>
