@@ -1,61 +1,67 @@
 import express from "express";
-import axios from "axios";
-import compression from "compression";
-import cookieParser from "cookie-parser";
-import path from "path";
-import { fileURLToPath } from "url";
+import fetch from "node-fetch";
 import { JSDOM } from "jsdom";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(compression());
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static("public"));
+app.set("views", "./views");
+app.set("view engine", "ejs");
 
+// ホームページ
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "index.html"));
+  res.render("index");
 });
 
-// Proxy + Note整形 + URL書き換え
+// プロキシ処理
 app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
-  if (!targetUrl) return res.status(400).send("URLを指定してください。例: /proxy?url=https://note.com/");
+  if (!targetUrl) return res.send("URLが指定されていません");
 
   try {
-    const response = await axios.get(targetUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-      },
-      timeout: 10000
-    });
+    const response = await fetch(targetUrl);
+    let contentType = response.headers.get("content-type");
 
-    let html = response.data;
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
+    if (contentType && contentType.includes("text/html")) {
+      let html = await response.text();
+      const dom = new JSDOM(html);
+      const document = dom.window.document;
 
-    // Noteの記事部分を取得
-    const article = document.querySelector("article");
-    if (article) {
-      // CSSやJSのパスを絶対URL化
-      const base = new URL(targetUrl).origin;
-      [...document.querySelectorAll("link[href], script[src], img[src], a[href]")].forEach(el => {
-        if (el.href) el.href = `/proxy?url=${encodeURIComponent(el.href)}`;
-        if (el.src) el.src = new URL(el.src, base).href;
+      // <a> のリンクを全部 proxy 経由に書き換える
+      document.querySelectorAll("a").forEach(a => {
+        let href = a.getAttribute("href");
+        if (href && !href.startsWith("javascript:") && !href.startsWith("#")) {
+          try {
+            const absolute = new URL(href, targetUrl).href;
+            a.setAttribute("href", `/proxy?url=${encodeURIComponent(absolute)}`);
+          } catch {}
+        }
       });
-      html = `<html><head><meta charset="UTF-8"><title>Note Article</title></head><body>${article.outerHTML}</body></html>`;
-    }
 
-    res.set("Content-Type", "text/html");
-    res.send(html);
+      // CSS, JS, 画像など相対パスを絶対URLに修正
+      ["link", "script", "img"].forEach(tag => {
+        document.querySelectorAll(tag).forEach(el => {
+          let attr = tag === "link" ? "href" : "src";
+          let val = el.getAttribute(attr);
+          if (val) {
+            try {
+              const absolute = new URL(val, targetUrl).href;
+              el.setAttribute(attr, absolute);
+            } catch {}
+          }
+        });
+      });
+
+      res.send(dom.serialize());
+    } else {
+      // HTML以外（画像やCSSなど）はそのまま転送
+      res.set("Content-Type", contentType || "application/octet-stream");
+      response.body.pipe(res);
+    }
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("URLの取得に失敗しました。JavaScriptが必要な場合があります。");
+    console.error(err);
+    res.status(500).send("プロキシエラー");
   }
 });
 
