@@ -1,46 +1,33 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
   <title>Yubikiri Browser</title>
   <style>
     body { font-family: sans-serif; margin: 20px; }
-    #urlInput { width: 70%; padding: 8px; }
-    #goBtn { padding: 8px 12px; }
-    iframe { width: 100%; height: 80vh; border: 1px solid #ccc; margin-top: 20px; }
+    input { width: 80%; padding: 8px; }
+    button { padding: 8px 12px; }
+    iframe { width: 100%; height: 80vh; margin-top: 20px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
   <h1>Yubikiri Browser</h1>
-  <form id="goForm">
-    <input type="text" id="urlInput" placeholder="URLまたは検索語句を入力">
-    <button type="submit" id="goBtn">GO</button>
+  <form id="form">
+    <input type="text" id="urlInput" placeholder="https://example.com" />
+    <button type="submit">GO</button>
   </form>
-
-  <iframe id="browserFrame" src=""></iframe>
+  <iframe id="proxyFrame"></iframe>
 
   <script>
-    const form = document.getElementById('goForm');
-    const input = document.getElementById('urlInput');
-    const iframe = document.getElementById('browserFrame');
+    const form = document.getElementById("form");
+    const input = document.getElementById("urlInput");
+    const frame = document.getElementById("proxyFrame");
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener("submit", (e) => {
       e.preventDefault();
-      let value = input.value.trim();
-
-      if (!value) {
-        alert('URLか検索語句を入力してください');
-        return;
-      }
-
-      // URL判定（簡易）
-      if (!/^https?:\/\//i.test(value)) {
-        value = 'https://duckduckgo.com/?q=' + encodeURIComponent(value);
-      }
-
-      // iframeでプロキシ経由で開く
-      iframe.src = '/proxy?url=' + encodeURIComponent(value);
+      let url = input.value.trim();
+      if (!url.startsWith("http")) url = "http://" + url;
+      frame.src = "/proxy?url=" + encodeURIComponent(url);
     });
   </script>
 </body>
