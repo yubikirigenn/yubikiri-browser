@@ -2,12 +2,11 @@ import express from "express";
 import fetch from "node-fetch";
 import cookieParser from "cookie-parser";
 import compression from "compression";
-import * as cheerio from "cheerio";
+import * as cheerio from "cheerio"; // ←ここを修正
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// ミドルウェア
 app.use(cookieParser());
 app.use(compression());
 app.use(express.urlencoded({ extended: true }));
@@ -20,11 +19,6 @@ app.get("/", (req, res) => {
     <html>
       <head>
         <title>Yubikiri Browser</title>
-        <style>
-          body { font-family: Arial, sans-serif; text-align: center; margin: 50px; }
-          input { width: 300px; padding: 5px; }
-          button { padding: 5px 10px; }
-        </style>
       </head>
       <body>
         <h1>Yubikiri Browser</h1>
@@ -48,28 +42,19 @@ app.get("/", (req, res) => {
   `);
 });
 
-// プロキシ処理
+// プロキシ
 app.get("/fetch", async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send("URL required");
 
   try {
-    const response = await fetch(targetUrl, {
-      headers: {
-        "User-Agent": req.headers["user-agent"] || "Mozilla/5.0",
-        "Accept": "*/*",
-      },
-      redirect: "follow",
-    });
-
+    const response = await fetch(targetUrl, { redirect: "follow" });
     let body = await response.text();
     const contentType = response.headers.get("content-type") || "";
 
-    // HTML の場合
     if (contentType.includes("text/html")) {
       const $ = cheerio.load(body);
 
-      // CSP や X-Frame-Options 無効化
       $("meta[http-equiv]").each((i, el) => {
         const httpEquiv = $(el).attr("http-equiv")?.toLowerCase();
         if (httpEquiv === "content-security-policy" || httpEquiv === "x-frame-options") {
@@ -77,7 +62,6 @@ app.get("/fetch", async (req, res) => {
         }
       });
 
-      // リンク書き換え
       $("a, link, script, img, form").each((i, el) => {
         const attr = el.name === "form" ? "action" : el.name === "a" ? "href" : "src";
         const val = $(el).attr(attr);
@@ -90,7 +74,6 @@ app.get("/fetch", async (req, res) => {
       body = $.html();
     }
 
-    // レスポンスヘッダー調整
     res.set("Content-Type", contentType);
     res.send(body);
 
