@@ -1,28 +1,39 @@
 import express from "express";
-import https from "https";
-import http from "http";
+import axios from "axios";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static("public"));
 
-// URLを受け取り、サーバー経由で取得して返す
-app.get("/fetch", (req, res) => {
-  const url = req.query.url;
-  if (!url) return res.status(400).send("Not found: url parameter is missing");
-
-  const target = url.startsWith("https") ? https : http;
-
-  target.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, (resp) => {
-    let data = "";
-    resp.on("data", chunk => data += chunk);
-    resp.on("end", () => res.send(data));
-  }).on("error", () => {
-    res.status(500).send("Failed to fetch the URL");
-  });
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
-app.listen(PORT, () => console.log(`Hello Browser running on port ${PORT}`));
+// サーバーサイドでページを取得
+app.post("/go", async (req, res) => {
+  const url = req.body.url;
+  if (!url) return res.send("Not found: url parameter is missing");
+
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0" // 基本ブラウザっぽく
+      },
+      timeout: 10000
+    });
+    res.send(response.data);
+  } catch (err) {
+    res.send("Error fetching page: " + err.message);
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Yubikiri Browser running on port ${PORT}`);
+});
