@@ -1,67 +1,78 @@
 import express from "express";
-import fetch from "node-fetch";
+import compression from "compression";
+import cookieParser from "cookie-parser";
 import { JSDOM } from "jsdom";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(express.static("public"));
-app.set("views", "./views");
-app.set("view engine", "ejs");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// ホームページ
+// ミドルウェア
+app.use(compression());
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// フロントページ
 app.get("/", (req, res) => {
-  res.render("index");
+  res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
-// プロキシ処理
+// Proxyルート
 app.get("/proxy", async (req, res) => {
-  const targetUrl = req.query.url;
-  if (!targetUrl) return res.send("URLが指定されていません");
-
   try {
-    const response = await fetch(targetUrl);
-    let contentType = response.headers.get("content-type");
+    let targetUrl = req.query.url;
+
+    if (!targetUrl) {
+      return res.status(400).send("Missing URL parameter.");
+    }
+
+    // 入力がURLでなければDuckDuckGo検索にする
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = `https://duckduckgo.com/?q=${encodeURIComponent(targetUrl)}`;
+    }
+
+    // fetchで取得
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      },
+    });
+
+    const contentType = response.headers.get("content-type");
 
     if (contentType && contentType.includes("text/html")) {
-      let html = await response.text();
-      const dom = new JSDOM(html);
-      const document = dom.window.document;
+      let text = await response.text();
+      const dom = new JSDOM(text);
 
-      // <a> のリンクを全部 proxy 経由に書き換える
-      document.querySelectorAll("a").forEach(a => {
-        let href = a.getAttribute("href");
-        if (href && !href.startsWith("javascript:") && !href.startsWith("#")) {
+      // 相対リンクをproxy経由に書き換え
+      dom.window.document.querySelectorAll("a").forEach((a) => {
+        const href = a.getAttribute("href");
+        if (href && !href.startsWith("http") && !href.startsWith("javascript")) {
           try {
-            const absolute = new URL(href, targetUrl).href;
-            a.setAttribute("href", `/proxy?url=${encodeURIComponent(absolute)}`);
+            a.href = `/proxy?url=${new URL(href, targetUrl).href}`;
           } catch {}
+        } else if (href && href.startsWith("http")) {
+          a.href = `/proxy?url=${href}`;
         }
       });
 
-      // CSS, JS, 画像など相対パスを絶対URLに修正
-      ["link", "script", "img"].forEach(tag => {
-        document.querySelectorAll(tag).forEach(el => {
-          let attr = tag === "link" ? "href" : "src";
-          let val = el.getAttribute(attr);
-          if (val) {
-            try {
-              const absolute = new URL(val, targetUrl).href;
-              el.setAttribute(attr, absolute);
-            } catch {}
-          }
-        });
-      });
-
+      res.set("content-type", "text/html");
       res.send(dom.serialize());
     } else {
-      // HTML以外（画像やCSSなど）はそのまま転送
-      res.set("Content-Type", contentType || "application/octet-stream");
-      response.body.pipe(res);
+      // HTML以外（画像・CSS・JSなど）
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (contentType) res.set("content-type", contentType);
+      res.send(buffer);
     }
   } catch (err) {
-    console.error(err);
-    res.status(500).send("プロキシエラー");
+    console.error("Proxy error:", err);
+    res.status(500).send("Proxy error.");
   }
 });
 
