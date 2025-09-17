@@ -5,58 +5,76 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>yubikiri-browser</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-    header { background: #1E90FF; color: white; padding: 1rem; text-align: center; }
-    main { padding: 1rem; }
-    input[type="text"] { width: 70%; padding: 0.5rem; }
-    button { padding: 0.5rem 1rem; margin-left: 0.5rem; }
-    iframe { width: 100%; height: 80vh; border: none; margin-top: 1rem; }
+    body { font-family: sans-serif; background: #f2f2f2; padding: 2rem; }
+    h1 { color: #333; }
+    form { margin-bottom: 1rem; }
+    input[type="text"] {
+      width: 70%; padding: 0.5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px;
+    }
+    button {
+      padding: 0.5rem 1rem; font-size: 1rem;
+      background: #007bff; color: white; border: none; border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    #history { margin-top: 2rem; }
+    #history h2 { font-size: 1.2rem; }
+    #history ul { list-style: none; padding-left: 0; }
+    #history li { margin: 0.3rem 0; }
+    #history a { text-decoration: none; color: #007bff; }
+    #history a:hover { text-decoration: underline; }
+    #notice { margin-top: 2rem; font-size: 0.9rem; color: #555; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>yubikiri-browser</h1>
-  </header>
-  <main>
-    <form id="proxyForm">
-      <input type="text" id="urlInput" placeholder="https://example.com" required>
-      <button type="submit">GO</button>
-    </form>
-    <iframe id="resultFrame"></iframe>
-  </main>
+  <h1>yubikiri-browser</h1>
+
+  <form id="proxyForm" action="/proxy" method="get">
+    <input type="text" name="url" placeholder="URLを入力してください" required>
+    <button type="submit">GO</button>
+  </form>
+
+  <div id="history">
+    <h2>最近アクセスしたURL</h2>
+    <ul id="historyList"></ul>
+  </div>
+
+  <div id="notice">
+    ※ 一部サイトではレイアウトが崩れる場合があります。<br>
+    ※ 埋め込み動画や制限のあるコンテンツはプロキシ経由で表示されますが、100%の互換性は保証できません。
+  </div>
 
   <script>
     const form = document.getElementById("proxyForm");
-    const input = document.getElementById("urlInput");
-    const iframe = document.getElementById("resultFrame");
+    const input = form.querySelector("input[name='url']");
+    const historyList = document.getElementById("historyList");
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const url = input.value.trim();
-      if (!url) return;
-      
-      try {
-        const res = await fetch("/proxy", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url })
-        });
-
-        const text = await res.text();
-        const blob = new Blob([text], { type: "text/html" });
-        const blobUrl = URL.createObjectURL(blob);
-        iframe.src = blobUrl;
-      } catch (err) {
-        iframe.srcdoc = "<p style='color:red;'>Failed to load the page.</p>";
-        console.error(err);
-      }
+    // 履歴ロード
+    const historyData = JSON.parse(localStorage.getItem("yubikiri_history") || "[]");
+    historyData.forEach(url => {
+      const li = document.createElement("li");
+      li.innerHTML = `<a href="/proxy?url=${encodeURIComponent(url)}" target="_blank">${url}</a>`;
+      historyList.appendChild(li);
     });
 
-    // EnterでもGO
-    input.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        form.dispatchEvent(new Event("submit"));
-      }
+    // フォーム送信時に履歴追加
+    form.addEventListener("submit", e => {
+      const urlValue = input.value.trim();
+      if (!urlValue) return e.preventDefault();
+
+      let updatedHistory = JSON.parse(localStorage.getItem("yubikiri_history") || "[]");
+      updatedHistory = updatedHistory.filter(u => u !== urlValue);
+      updatedHistory.unshift(urlValue);
+      if (updatedHistory.length > 10) updatedHistory.pop(); // 最大10件
+      localStorage.setItem("yubikiri_history", JSON.stringify(updatedHistory));
+
+      // URLを自動でエンコードして /proxy に送る
+      input.value = encodeURIComponent(urlValue);
+    });
+
+    // EnterでもGOできる
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") form.submit();
     });
   </script>
 </body>
