@@ -2,91 +2,63 @@ import express from "express";
 import fetch from "node-fetch";
 import cookieParser from "cookie-parser";
 import compression from "compression";
+import cheerio from "cheerio";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cookieParser());
 app.use(compression());
-app.use(express.static("public")); // /public フォルダの静的ファイルを配信
+app.use(express.static(path.join(__dirname, "public")));
 
-function rewriteHtml(html, baseUrl) {
-  // リンク・画像・スクリプト・スタイル・iframe・動画などのURLを書き換え
-  return html
-    .replace(/(href|src|action|data-[^=]+)=["'](.*?)["']/g, (m, attr, url) => {
-      if (!url.startsWith("http") && !url.startsWith("//")) return m;
-      const fullUrl = url.startsWith("//") ? "https:" + url : url;
-      return `${attr}="/proxy?url=${encodeURIComponent(fullUrl)}"`;
-    })
-    .replace(/url\((['"]?)(.*?)\1\)/g, (m, quote, url) => {
-      if (!url.startsWith("http") && !url.startsWith("//")) return m;
-      const fullUrl = url.startsWith("//") ? "https:" + url : url;
-      return `url(${quote}/proxy?url=${encodeURIComponent(fullUrl)}${quote})`;
-    })
-    .replace(/fetch\((['"`])(.*?)\1/g, (m, quote, url) => {
-      if (!url.startsWith("http") && !url.startsWith("//")) return m;
-      const fullUrl = url.startsWith("//") ? "https:" + url : url;
-      return `fetch("/proxy?url=${encodeURIComponent(fullUrl)}`;
-    });
-}
+const PORT = process.env.PORT || 10000;
 
+// フロントページ
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "index.html"));
+});
+
+// プロキシ
 app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
-  if (!targetUrl) return res.status(400).send("URL required");
+  if (!targetUrl) return res.status(400).send("URL is required");
 
   try {
-    const response = await fetch(targetUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0",
-        "Referer": targetUrl,
-        "Origin": targetUrl,
-      },
-    });
+    const response = await fetch(targetUrl, { redirect: "follow" });
+    const contentType = response.headers.get("content-type") || "";
 
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("text/html")) {
-      let body = await response.text();
-      body = rewriteHtml(body, targetUrl);
-      res.send(body);
+    if (contentType.includes("text/html")) {
+      let html = await response.text();
+      const $ = cheerio.load(html);
+
+      // ページ内リンク書き換え
+      $("a,link,script,iframe,img").each((_, el) => {
+        const attribs = ["href", "src"];
+        attribs.forEach((attr) => {
+          if ($(el).attr(attr)) {
+            const val = $(el).attr(attr);
+            if (val.startsWith("http")) {
+              $(el).attr(attr, `/proxy?url=${encodeURIComponent(val)}`);
+            }
+          }
+        });
+      });
+
+      res.send($.html());
     } else {
-      response.body.pipe(res);
+      // HTML以外はバイナリ転送
+      const buffer = await response.arrayBuffer();
+      res.set("Content-Type", contentType);
+      res.send(Buffer.from(buffer));
     }
   } catch (err) {
-    res.status(500).send("Fetch error: " + err.message);
+    res.status(500).send("Error fetching URL: " + err.message);
   }
 });
 
-app.get("/", (req, res) => {
-  res.send(`
-    <html>
-      <head>
-        <title>Yubikiri Browser</title>
-        <style>
-          body { font-family: sans-serif; margin: 50px; }
-          input { width: 300px; padding: 5px; }
-          button { padding: 5px 10px; }
-        </style>
-      </head>
-      <body>
-        <h1>Yubikiri Browser</h1>
-        <form id="proxyForm">
-          <input type="text" id="urlInput" placeholder="Enter URL" />
-          <button type="submit">GO</button>
-        </form>
-        <script>
-          const form = document.getElementById("proxyForm");
-          form.addEventListener("submit", e => {
-            e.preventDefault();
-            const url = document.getElementById("urlInput").value;
-            window.location.href = '/proxy?url=' + encodeURIComponent(url);
-          });
-          document.getElementById("urlInput").addEventListener("keydown", e => {
-            if(e.key === "Enter") form.dispatchEvent(new Event("submit", {cancelable: true}));
-          });
-        </script>
-      </body>
-    </html>
-  `);
-});
-
-app.listen(10000, () => {
-  console.log("Yubikiri Browser running on port 10000");
+app.listen(PORT, () => {
+  console.log(`Yubikiri Browser running on port ${PORT}`);
 });
