@@ -2,63 +2,58 @@ import express from "express";
 import fetch from "node-fetch";
 import cookieParser from "cookie-parser";
 import compression from "compression";
-import cheerio from "cheerio";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import * as cheerio from "cheerio";
 
 const app = express();
-app.use(cookieParser());
-app.use(compression());
-app.use(express.static(path.join(__dirname, "public")));
-
 const PORT = process.env.PORT || 10000;
 
-// フロントページ
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(cookieParser());
+app.use(compression());
+app.use(express.static("public")); // /public 配下の静的ファイルを提供
+
+// ルートページ
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "index.html"));
+  res.sendFile(new URL("./views/index.html", import.meta.url));
 });
 
-// プロキシ
-app.get("/proxy", async (req, res) => {
-  const targetUrl = req.query.url;
-  if (!targetUrl) return res.status(400).send("URL is required");
+// プロキシ処理
+app.post("/proxy", async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).send("URL required");
 
   try {
-    const response = await fetch(targetUrl, { redirect: "follow" });
-    const contentType = response.headers.get("content-type") || "";
+    // 制限回避用にヘッダを偽装
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": url,
+      },
+      redirect: "follow",
+    });
 
-    if (contentType.includes("text/html")) {
-      let html = await response.text();
-      const $ = cheerio.load(html);
+    let text = await response.text();
 
-      // ページ内リンク書き換え
-      $("a,link,script,iframe,img").each((_, el) => {
-        const attribs = ["href", "src"];
-        attribs.forEach((attr) => {
-          if ($(el).attr(attr)) {
-            const val = $(el).attr(attr);
-            if (val.startsWith("http")) {
-              $(el).attr(attr, `/proxy?url=${encodeURIComponent(val)}`);
-            }
-          }
-        });
-      });
+    // cheerioでHTML操作（リンクの書き換えなど）
+    const $ = cheerio.load(text);
+    $("a").each((i, el) => {
+      const href = $(el).attr("href");
+      if (href && !href.startsWith("http")) {
+        $(el).attr("href", url + href); // 相対リンクを絶対リンクに変換
+      }
+    });
+    text = $.html();
 
-      res.send($.html());
-    } else {
-      // HTML以外はバイナリ転送
-      const buffer = await response.arrayBuffer();
-      res.set("Content-Type", contentType);
-      res.send(Buffer.from(buffer));
-    }
+    res.send(text);
   } catch (err) {
-    res.status(500).send("Error fetching URL: " + err.message);
+    console.error(err);
+    res.status(500).send("Error fetching URL");
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Yubikiri Browser running on port ${PORT}`);
+  console.log(`yubikiri-browser running on port ${PORT}`);
 });
