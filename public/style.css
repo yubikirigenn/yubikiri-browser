@@ -1,25 +1,56 @@
-body {
-  font-family: Arial, sans-serif;
-  background: #f7f7f7;
+html, body {
+  height: 100%;
   margin: 0;
-  padding: 0;
+  font-family: Arial, sans-serif;
+  background-color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
+
 .container {
-  width: 90%;
-  max-width: 800px;
-  margin: 50px auto;
   text-align: center;
+  width: 90%;
+  max-width: 600px;
 }
-#urlInput {
-  width: 70%;
-  padding: 8px;
+
+h1 {
+  font-size: 48px;
+  margin-bottom: 20px;
+  color: #202124;
 }
-#goBtn {
-  padding: 8px 12px;
+
+input[type="text"] {
+  width: 80%;
+  padding: 10px 15px;
+  font-size: 18px;
+  border: 1px solid #dfe1e5;
+  border-radius: 24px;
+  outline: none;
+  margin-bottom: 10px;
+  box-sizing: border-box;
 }
-#proxyFrame {
+
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  margin-left: 10px;
+  border: none;
+  background-color: #1a73e8;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #1669c1;
+}
+
+iframe {
   width: 100%;
-  height: 80vh;
+  height: 70vh;
   margin-top: 20px;
-  border: 1px solid #ccc;
+  border: 1px solid #dfe1e5;
+  border-radius: 4px;
+  background: #fff;
 }
