@@ -1,34 +1,28 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Yubikiri Browser</title>
-  <style>
-    body { font-family: sans-serif; margin: 20px; }
-    input { width: 80%; padding: 8px; }
-    button { padding: 8px 12px; }
-    iframe { width: 100%; height: 90vh; border: 1px solid #ccc; }
-  </style>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <h1>Yubikiri Browser</h1>
-  <form id="form">
-    <input type="text" id="urlInput" placeholder="https://example.com" />
-    <button type="submit">GO</button>
-  </form>
-  <iframe id="proxyFrame"></iframe>
-
+  <div class="container">
+    <h1>Yubikiri Browser</h1>
+    <input type="text" id="urlInput" placeholder="Enter URL">
+    <button id="goBtn">GO</button>
+    <iframe id="proxyFrame" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+  </div>
+  <script src="/uv.bundle.js"></script>
   <script>
-    const form = document.getElementById("form");
-    const input = document.getElementById("urlInput");
-    const frame = document.getElementById("proxyFrame");
+    const goBtn = document.getElementById('goBtn');
+    const urlInput = document.getElementById('urlInput');
+    const proxyFrame = document.getElementById('proxyFrame');
 
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      let url = input.value.trim();
-      if (!url.startsWith("http")) url = "http://" + url;
-      // 1ページだけ表示
-      frame.src = "/proxy?url=" + encodeURIComponent(url);
+    goBtn.addEventListener('click', () => {
+      const url = urlInput.value.trim();
+      if (!url) return alert('URLを入力してください');
+      // Ultraviolet でプロキシ経由に変換
+      proxyFrame.src = UV.getProxyUrl(url);
     });
   </script>
 </body>
