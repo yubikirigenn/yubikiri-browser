@@ -1,70 +1,32 @@
 import express from "express";
-import bodyParser from "body-parser";
 import fetch from "node-fetch";
-import path from "path";
-import { fileURLToPath } from "url";
-import * as cheerio from "cheerio"; // ← 修正版インポート
+import * as cheerio from "cheerio";
+import compression from "compression";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(compression());
 
-// 現在のファイルパスを取得
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ミドルウェア
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
-
-// ホーム画面
+// === ホーム画面 ===
 app.get("/", (req, res) => {
   res.send(`
     <html>
       <head>
         <title>Yubikiri Browser</title>
         <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background: #f4f4f4;
-          }
-          h1 {
-            color: #333;
-          }
-          form {
-            margin-top: 20px;
-          }
-          input[type="text"] {
-            width: 80%;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-          }
-          button {
-            padding: 10px 20px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-          }
-          button:hover {
-            background: #0056b3;
-          }
+          body { font-family: sans-serif; text-align: center; margin-top: 100px; }
+          input { width: 400px; padding: 10px; font-size: 16px; }
+          button { padding: 10px 20px; font-size: 16px; margin-left: 5px; }
         </style>
       </head>
       <body>
-        <h1>Yubikiri Browser</h1>
+        <h1>🌐 Yubikiri Browser</h1>
         <form action="/proxy" method="get">
-          <input type="text" name="url" id="urlInput" placeholder="Enter URL (https://...)" required>
+          <input type="text" name="url" placeholder="https://example.com" required>
           <button type="submit">Go</button>
         </form>
         <script>
-          document.getElementById("urlInput").addEventListener("keypress", function(e) {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              this.form.submit();
-            }
+          document.querySelector("input").addEventListener("keydown", e => {
+            if (e.key === "Enter") e.target.form.submit();
           });
         </script>
       </body>
@@ -72,40 +34,45 @@ app.get("/", (req, res) => {
   `);
 });
 
-// プロキシ処理
+// === プロキシ ===
 app.get("/proxy", async (req, res) => {
-  let targetUrl = req.query.url;
-
-  if (!targetUrl) {
-    return res.send("URL is required!");
-  }
-
-  if (!/^https?:\/\//i.test(targetUrl)) {
-    targetUrl = "http://" + targetUrl;
-  }
+  const targetUrl = req.query.url;
+  if (!targetUrl) return res.send("No URL provided");
 
   try {
-    const response = await fetch(targetUrl);
-    let body = await response.text();
-    const contentType = response.headers.get("content-type");
+    const response = await fetch(targetUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 YubikiriBrowser" }
+    });
 
-    if (contentType && contentType.includes("text/html")) {
+    let body = await response.text();
+    const contentType = response.headers.get("content-type") || "";
+
+    res.set("Content-Type", contentType);
+
+    // HTML のときだけリンクを書き換え
+    if (contentType.includes("text/html")) {
       const $ = cheerio.load(body);
 
-      // 相対リンクを絶対リンクに変換
-      $("a").each((_, el) => {
-        let href = $(el).attr("href");
-        if (href && !href.startsWith("http")) {
-          $(el).attr("href", new URL(href, targetUrl).href);
+      const rewrite = (el, attr) => {
+        let val = $(el).attr(attr);
+        if (val) {
+          try {
+            let abs = new URL(val, targetUrl).href;
+            $(el).attr(attr, "/proxy?url=" + encodeURIComponent(abs));
+          } catch {}
         }
-      });
+      };
 
-      $("img").each((_, el) => {
-        let src = $(el).attr("src");
-        if (src && !src.startsWith("http")) {
-          $(el).attr("src", new URL(src, targetUrl).href);
-        }
-      });
+      $("a").each((_, el) => rewrite(el, "href"));
+      $("img").each((_, el) => rewrite(el, "src"));
+      $("script").each((_, el) => rewrite(el, "src"));
+      $("link").each((_, el) => rewrite(el, "href"));
+      $("iframe").each((_, el) => rewrite(el, "src"));
+      $("form").each((_, el) => rewrite(el, "action"));
+
+      // セキュリティ系ヘッダーを無効化
+      res.removeHeader("Content-Security-Policy");
+      res.removeHeader("X-Frame-Options");
 
       body = $.html();
     }
@@ -116,7 +83,6 @@ app.get("/proxy", async (req, res) => {
   }
 });
 
-// サーバー起動
-app.listen(PORT, () => {
-  console.log(`Yubikiri Browser running on port ${PORT}`);
-});
+// === 起動 ===
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("🚀 Yubikiri Browser running on port " + PORT));
