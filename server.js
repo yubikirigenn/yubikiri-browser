@@ -1,60 +1,52 @@
-import express from "express";
-import fetch from "node-fetch";
-import path from "path";
-import { fileURLToPath } from "url";
-import { URL } from "url";
+import http from 'http';
+import https from 'https';
+import fs from 'fs';
+import url from 'url';
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 10000;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+http.createServer((req, res) => {
+  const parsed = url.parse(req.url, true);
+  const query = parsed.query.q || '';
+  const pathname = parsed.pathname;
 
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "index.html"));
-});
-
-// 規制回避＆プロキシ
-app.get("/proxy", async (req, res) => {
-  let target = req.query.url;
-  if (!target) return res.send("URLまたは検索語句を入力してください。");
-
-  // URLでない場合はDuckDuckGo検索
-  if (!/^https?:\/\//i.test(target)) {
-    target = `https://duckduckgo.com/html/?q=${encodeURIComponent(target)}`;
+  // ブログ(note)ページ
+  if (pathname.startsWith('/note')) {
+    const html = fs.readFileSync('./views/note.html', 'utf8');
+    res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+    res.end(html);
+    return;
   }
 
-  try {
-    const response = await fetch(target, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                      "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-      }
-    });
-    let body = await response.text();
-
-    // 相対リンク・画像・CSS・JSもプロキシ経由
-    const baseUrl = new URL(target);
-    body = body.replace(/(href|src|action)=["']([^"']+)["']/gi, (match, attr, value) => {
-      try {
-        const absoluteUrl = new URL(value, baseUrl).href;
-        return `${attr}="/proxy?url=${encodeURIComponent(absoluteUrl)}"`;
-      } catch {
-        return match;
-      }
-    });
-
-    // Note等で CSP/TrustedScript エラーが出る場合、scriptタグ削除 or 書き換え
-    body = body.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
-
-    res.send(body);
-  } catch (err) {
-    res.status(500).send("エラー: " + err.message);
+  // URLか検索語句か判定
+  let targetUrl;
+  if (/^https?:\/\//.test(query)) {
+    targetUrl = query;
+  } else if (query) {
+    // 検索語句の場合は DuckDuckGo
+    targetUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+  } else {
+    // デフォルトページ
+    const html = fs.readFileSync('./public/index.html', 'utf8');
+    res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+    res.end(html);
+    return;
   }
-});
 
-app.listen(PORT, () => {
-  console.log(`Yubikiri Browser running on http://localhost:${PORT}`);
+  // プロキシ経由でリクエスト
+  const client = targetUrl.startsWith('https') ? https : http;
+  client.get(targetUrl, (proxyRes) => {
+    let body = '';
+    proxyRes.on('data', chunk => body += chunk);
+    proxyRes.on('end', () => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      res.end(body);
+    });
+  }).on('error', err => {
+    res.writeHead(500, {'Content-Type':'text/plain'});
+    res.end('Proxy error: ' + err.message);
+  });
+
+}).listen(PORT, () => {
+  console.log(`Yubikiri Browser running on port ${PORT}`);
 });
