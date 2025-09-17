@@ -4,7 +4,7 @@ import compression from "compression";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
-import { JSDOM } from "jsdom"; // HTML操作用
+import { JSDOM } from "jsdom";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,15 +15,12 @@ const PORT = process.env.PORT || 10000;
 app.use(compression());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
-app.set("views", path.join(__dirname, "views"));
-app.set("view engine", "ejs"); // EJS 使う場合
 
-// トップページ
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
-// プロキシ＋note整形
+// Proxy + Note整形 + URL書き換え
 app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send("URLを指定してください。例: /proxy?url=https://note.com/");
@@ -38,15 +35,20 @@ app.get("/proxy", async (req, res) => {
       timeout: 10000
     });
 
-    // note記事なら本文部分だけ抽出
     let html = response.data;
-    if (targetUrl.includes("note.com")) {
-      const dom = new JSDOM(html);
-      const document = dom.window.document;
-      const article = document.querySelector("article"); // noteの記事本文
-      if (article) {
-        html = `<html><head><meta charset="UTF-8"><title>Note Article</title></head><body>${article.outerHTML}</body></html>`;
-      }
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+
+    // Noteの記事部分を取得
+    const article = document.querySelector("article");
+    if (article) {
+      // CSSやJSのパスを絶対URL化
+      const base = new URL(targetUrl).origin;
+      [...document.querySelectorAll("link[href], script[src], img[src], a[href]")].forEach(el => {
+        if (el.href) el.href = `/proxy?url=${encodeURIComponent(el.href)}`;
+        if (el.src) el.src = new URL(el.src, base).href;
+      });
+      html = `<html><head><meta charset="UTF-8"><title>Note Article</title></head><body>${article.outerHTML}</body></html>`;
     }
 
     res.set("Content-Type", "text/html");
