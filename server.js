@@ -1,93 +1,105 @@
-// server.js
 import express from "express";
 import fetch from "node-fetch";
 import cookieParser from "cookie-parser";
 import compression from "compression";
-import cheerio from "cheerio";
-import { URL } from "url";
+import * as cheerio from "cheerio";
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(express.urlencoded({ extended: true }));
+// ミドルウェア
 app.use(cookieParser());
 app.use(compression());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(express.static("public"));
 
-// ユーザーが入力するトップページ
+// フォーム
 app.get("/", (req, res) => {
   res.send(`
     <html>
       <head>
-        <meta charset="UTF-8">
-        <title>yubikiri-browser</title>
+        <title>Yubikiri Browser</title>
         <style>
-          body { font-family: sans-serif; margin: 2em; }
-          input[type="text"] { width: 60%; padding: 0.5em; }
-          input[type="submit"] { padding: 0.5em 1em; }
+          body { font-family: Arial, sans-serif; text-align: center; margin: 50px; }
+          input { width: 300px; padding: 5px; }
+          button { padding: 5px 10px; }
         </style>
       </head>
       <body>
-        <h1>yubikiri-browser</h1>
-        <form action="/proxy" method="get">
-          <input type="text" name="url" placeholder="https://example.com" />
-          <input type="submit" value="GO" />
+        <h1>Yubikiri Browser</h1>
+        <form id="proxyForm">
+          <input type="text" id="urlInput" placeholder="Enter URL" />
+          <button type="submit">GO</button>
         </form>
-        <p>Enter でも GO できます。</p>
+        <script>
+          const form = document.getElementById("proxyForm");
+          form.addEventListener("submit", e => {
+            e.preventDefault();
+            const url = document.getElementById("urlInput").value;
+            window.location.href = '/fetch?url=' + encodeURIComponent(url);
+          });
+          document.getElementById("urlInput").addEventListener("keydown", e => {
+            if(e.key === "Enter") form.dispatchEvent(new Event("submit", {cancelable: true}));
+          });
+        </script>
       </body>
     </html>
   `);
 });
 
 // プロキシ処理
-app.get("/proxy", async (req, res) => {
-  let targetUrl = req.query.url;
-  if (!targetUrl) return res.redirect("/");
-
-  // URLを正規化
-  if (!/^https?:\/\//i.test(targetUrl)) targetUrl = "https://" + targetUrl;
+app.get("/fetch", async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl) return res.status(400).send("URL required");
 
   try {
     const response = await fetch(targetUrl, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-        Referer: targetUrl,
-        Origin: targetUrl,
+        "User-Agent": req.headers["user-agent"] || "Mozilla/5.0",
+        "Accept": "*/*",
       },
       redirect: "follow",
     });
 
-    let contentType = response.headers.get("content-type");
     let body = await response.text();
+    const contentType = response.headers.get("content-type") || "";
 
-    // HTMLならリンク書き換え
-    if (contentType && contentType.includes("text/html")) {
+    // HTML の場合
+    if (contentType.includes("text/html")) {
       const $ = cheerio.load(body);
 
+      // CSP や X-Frame-Options 無効化
+      $("meta[http-equiv]").each((i, el) => {
+        const httpEquiv = $(el).attr("http-equiv")?.toLowerCase();
+        if (httpEquiv === "content-security-policy" || httpEquiv === "x-frame-options") {
+          $(el).remove();
+        }
+      });
+
+      // リンク書き換え
       $("a, link, script, img, form").each((i, el) => {
-        let attr = $(el).attr("href") ? "href" : $(el).attr("src") ? "src" : $(el).attr("action") ? "action" : null;
-        if (attr) {
-          let original = $(el).attr(attr);
-          if (original && !original.startsWith("data:") && !original.startsWith("#")) {
-            try {
-              const newUrl = new URL(original, targetUrl).href;
-              if (attr === "action") $(el).attr(attr, "/proxy?url=" + encodeURIComponent(newUrl));
-              else $(el).attr(attr, "/proxy?url=" + encodeURIComponent(newUrl));
-            } catch {}
-          }
+        const attr = el.name === "form" ? "action" : el.name === "a" ? "href" : "src";
+        const val = $(el).attr(attr);
+        if (val && !val.startsWith("http") && !val.startsWith("data:")) {
+          const newUrl = new URL(val, targetUrl).toString();
+          $(el).attr(attr, `/fetch?url=${encodeURIComponent(newUrl)}`);
         }
       });
 
       body = $.html();
     }
 
+    // レスポンスヘッダー調整
     res.set("Content-Type", contentType);
-    res.set("Access-Control-Allow-Origin", "*");
     res.send(body);
+
   } catch (err) {
-    res.status(500).send("Error fetching: " + err.message);
+    console.error(err);
+    res.status(500).send("Error fetching URL");
   }
 });
 
-app.listen(PORT, () => console.log(`yubikiri-browser running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Yubikiri Browser running on port ${PORT}`);
+});
