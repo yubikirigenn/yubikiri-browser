@@ -1,58 +1,52 @@
 import express from 'express';
+import puppeteer from 'puppeteer';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
-import puppeteer from 'puppeteer';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(compression());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static('public'));
 
-// トップページ
+// GETでトップページ表示
 app.get('/', (req, res) => {
-  res.sendFile(`${process.cwd()}/views/index.html`);
+  res.sendFile('index.html', { root: './views' });
 });
 
-// Proxy
+// POSTでURLを受け取り、Puppeteerでページを取得
 app.post('/proxy', async (req, res) => {
-  const targetUrl = req.body.url;
-  if (!targetUrl) return res.status(400).send('URL is required');
+  const url = req.body.url;
+  if (!url) return res.status(400).send('URLが指定されていません');
 
+  let browser;
   try {
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
+
     const page = await browser.newPage();
 
-    // Cookie保持
-    const cookies = req.cookies.pbc || [];
-    if (cookies.length) await page.setCookie(...cookies);
+    // 制限回避用のUser-Agent設定
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
 
-    // JS-heavyサイト対応
-    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // ページ内の動的要素や制限回避
-    await page.addScriptTag({ content: `
-      // 必要に応じて CSP・広告ブロック回避などの処理
-      console.log('Yubikiri Browser active');
-    `});
-
-    // Cookie更新
-    const newCookies = await page.cookies();
-    res.cookie('pbc', newCookies, { httpOnly: true });
-
-    // HTML取得
+    // ページ内容取得
     const content = await page.content();
-    await browser.close();
     res.send(content);
+
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error loading page');
+    res.status(500).send('ページ取得に失敗しました');
+  } finally {
+    if (browser) await browser.close();
   }
 });
 
