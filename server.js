@@ -16,23 +16,26 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
-// サーバーサイドプロキシ（Cloudflare/JS チャレンジ対応）
+// サーバーサイドプロキシ
 app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
-  if (!targetUrl)
+  if (!targetUrl) {
     return res.status(400).json({ success: false, message: "URL パラメータが必要です" });
+  }
 
   try {
+    // cloudscraper で JS チャレンジや制限突破
     const html = await cloudscraper.get(targetUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
         Accept: "*/*",
       },
+      followAllRedirects: true,
     });
 
-    // cheerio でリンク書き換え
     const $ = cheerio.load(html);
 
+    // リンクやリソースを書き換え
     const rewriteAttr = (selector, attr) => {
       $(selector).each((_, el) => {
         const val = $(el).attr(attr);
