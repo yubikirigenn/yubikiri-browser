@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// トップページ（検索UI）
+// トップページ
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "index.html"));
 });
@@ -59,7 +59,7 @@ app.get("/proxy", async (req, res) => {
 
       res.setHeader("Content-Type", "text/html");
       res.send($.html());
-    }
+    } 
     else if (contentType.includes("text/css")) {
       let css = await response.text();
       css = css.replace(/url\((.*?)\)/g, (match, p1) => {
@@ -71,7 +71,7 @@ app.get("/proxy", async (req, res) => {
       });
       res.setHeader("Content-Type", "text/css");
       res.send(css);
-    }
+    } 
     else {
       const buffer = Buffer.from(await response.arrayBuffer());
       res.setHeader("Content-Type", contentType);
