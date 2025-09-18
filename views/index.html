@@ -7,12 +7,14 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="main-container">
+  <div class="top-bar">
     <h1 class="logo">yubikiri-proxy</h1>
-    <form id="proxyForm" class="search-form" action="/proxy" method="get" target="_blank">
-      <input type="text" name="url" placeholder="URLを入力してください" required />
+    <form id="proxyForm" class="search-form">
+      <input type="text" id="urlInput" placeholder="URLを入力してください" required />
       <button type="submit">Go</button>
     </form>
   </div>
+  <iframe id="proxyFrame" src="" frameborder="0"></iframe>
+  <script src="/script.js"></script>
 </body>
 </html>
