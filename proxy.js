@@ -1,4 +1,4 @@
-// proxy.js
+// proxy.js (変更)
 const axios = require('axios');
 const cheerio = require('cheerio');
 
@@ -14,7 +14,6 @@ function proxifyUrl(raw, base) {
   }
 }
 
-// HTML を取得して全てのリソース URL を /r?url=... に書き換えて返す
 async function html(req, res) {
   let target = req.query.url;
   if (!target) return res.status(400).send('URL is required');
@@ -30,7 +29,10 @@ async function html(req, res) {
 
     const $ = cheerio.load(response.data, { decodeEntities: false });
 
-    // handle regular attributes: href/src/srcset
+    // Remove meta CSP / frame restrictions that may be embedded in HTML
+    $('meta[http-equiv="Content-Security-Policy"], meta[name="content-security-policy"], meta[http-equiv="X-Frame-Options"], meta[name="x-frame-options"]').remove();
+
+    // Rewrite href/src/srcset attributes
     $('[href]').each((i, el) => {
       const v = $(el).attr('href');
       if (v) $(el).attr('href', proxifyUrl(v, target));
@@ -39,7 +41,7 @@ async function html(req, res) {
       const v = $(el).attr('src');
       if (v) $(el).attr('src', proxifyUrl(v, target));
     });
-    // srcset -> multiple urls
+    // srcset
     $('[srcset]').each((i, el) => {
       const s = $(el).attr('srcset');
       if (!s) return;
@@ -54,13 +56,28 @@ async function html(req, res) {
       $(el).attr('srcset', parts.join(', '));
     });
 
-    // CSS inside <style> tags: rewrite url(...)
+    // style tag: rewrite url(...) and @import
     $('style').each((i, el) => {
       let css = $(el).html() || '';
+      // rewrite @import "..."
+      css = css.replace(/@import\s+(?:url\()?['"]?(.*?)['"]?\)?\s*;/gi, (m, u) => {
+        if (/^(data:|javascript:|#)/i.test(u)) return m;
+        try {
+          const abs = new URL(u, target).href;
+          return `@import url("/r?url=${encodeURIComponent(abs)}");`;
+        } catch {
+          return m;
+        }
+      });
+      // rewrite url(...)
       css = css.replace(/url\((['"]?)(.*?)\1\)/g, (m, q, u) => {
         if (/^(data:|javascript:|#)/i.test(u)) return m;
-        const abs = new URL(u, target).href;
-        return `url(${q}/r?url=${encodeURIComponent(abs)}${q})`;
+        try {
+          const abs = new URL(u, target).href;
+          return `url(${q}/r?url=${encodeURIComponent(abs)}${q})`;
+        } catch {
+          return m;
+        }
       });
       $(el).html(css);
     });
@@ -70,14 +87,17 @@ async function html(req, res) {
       let style = $(el).attr('style') || '';
       style = style.replace(/url\((['"]?)(.*?)\1\)/g, (m, q, u) => {
         if (/^(data:|javascript:|#)/i.test(u)) return m;
-        const abs = new URL(u, target).href;
-        return `url(${q}/r?url=${encodeURIComponent(abs)}${q})`;
+        try {
+          const abs = new URL(u, target).href;
+          return `url(${q}/r?url=${encodeURIComponent(abs)}${q})`;
+        } catch {
+          return m;
+        }
       });
       $(el).attr('style', style);
     });
 
-    // Add a <base> tag so relative links inside the blob/html resolve against the proxied HTML file if needed
-    // but we rewrote most links to /r so base is just extra safety.
+    // ensure base href exists for relative resolution if needed
     if ($('head base').length === 0) {
       $('head').prepend(`<base href="${target}">`);
     }
@@ -90,7 +110,6 @@ async function html(req, res) {
   }
 }
 
-// /r handler: fetch resource and return. If CSS, rewrite url() inside CSS similarly.
 async function resource(req, res) {
   const target = req.query.url;
   if (!target) return res.status(400).send('url required');
@@ -105,9 +124,20 @@ async function resource(req, res) {
 
     const contentType = resp.headers['content-type'] || 'application/octet-stream';
 
-    // If CSS, rewrite url(...) inside CSS to point back to /r
+    // CSS specific: rewrite @import and url(...)
     if (contentType.includes('text/css') || target.endsWith('.css')) {
       let css = resp.data.toString('utf8');
+      // @import
+      css = css.replace(/@import\s+(?:url\()?['"]?(.*?)['"]?\)?\s*;/gi, (m, u) => {
+        if (/^(data:|javascript:|#)/i.test(u)) return m;
+        try {
+          const abs = new URL(u, target).href;
+          return `@import url("/r?url=${encodeURIComponent(abs)}");`;
+        } catch {
+          return m;
+        }
+      });
+      // url(...)
       css = css.replace(/url\((['"]?)(.*?)\1\)/g, (m, q, u) => {
         if (/^(data:|javascript:|#)/i.test(u)) return m;
         try {
@@ -121,9 +151,8 @@ async function resource(req, res) {
       return res.send(css);
     }
 
-    // Otherwise stream binary (images, fonts, js, etc.)
+    // Binary (images/fonts/js etc.)
     res.set('Content-Type', contentType);
-    // optional: set caching headers here if you want
     return res.send(Buffer.from(resp.data, 'binary'));
   } catch (err) {
     console.error('resource error', err.message || err);
