@@ -1,9 +1,14 @@
-const input = document.getElementById("url-input");
-const btn = document.getElementById("go-btn");
-const iframe = document.getElementById("proxy-frame");
+const form = document.getElementById('proxyForm');
+const iframe = document.getElementById('resultFrame');
 
-btn.addEventListener("click", () => {
-  const url = input.value.trim();
-  if (!url) return;
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const url = document.getElementById('url').value;
+
+  if (!url.startsWith('https://github.com')) {
+    alert('GitHubのURLを入力してください');
+    return;
+  }
+
   iframe.src = `/proxy?url=${encodeURIComponent(url)}`;
 });
