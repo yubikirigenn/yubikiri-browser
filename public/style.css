@@ -25,11 +25,6 @@ header {
   padding: 5px;
 }
 
-#message {
-  color: red;
-  margin-top: 10px;
-}
-
 #proxy-frame {
   position: absolute;
   top: 100px;
