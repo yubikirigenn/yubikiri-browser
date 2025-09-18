@@ -1,98 +1,90 @@
-// proxy.js (完全版 - fetch不要, 制限回避フル装備)
-const express = require('express');
-const http = require('http');
-const https = require('https');
-const { URL } = require('url');
+const http = require("http");
+const https = require("https");
+const express = require("express");
+const { URL } = require("url");
 
-const router = express.Router();
+const app = express();
+const PORT = process.env.PORT || 10000;
 
-router.get('/', (req, res) => {
+app.use(express.static("public"));
+app.set("views", "views");
+
+// ホーム画面
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/views/index.html");
+});
+
+// プロキシ処理
+app.get("/proxy", (req, res) => {
   const target = req.query.url;
-  if (!target) return res.status(400).send('url required');
+  if (!target) return res.status(400).send("URL is required");
 
   let targetUrl;
   try {
-    targetUrl = new URL(/^https?:\/\//i.test(target) ? target : 'https://' + target);
-  } catch (e) {
-    return res.status(400).send('invalid url');
+    targetUrl = new URL(target.startsWith("http") ? target : "http://" + target);
+  } catch {
+    return res.status(400).send("Invalid URL");
   }
 
-  console.log('[proxy] request:', targetUrl.href);
-
-  const client = targetUrl.protocol === 'https:' ? https : http;
+  const client = targetUrl.protocol === "https:" ? https : http;
 
   const options = {
     hostname: targetUrl.hostname,
-    port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
     path: targetUrl.pathname + targetUrl.search,
-    method: 'GET',
+    method: "GET",
     headers: {
-      // 本物ブラウザっぽい UA に偽装
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-      'Accept': '*/*',
-      'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-      'Referer': targetUrl.origin,
-      'Cookie': req.headers['cookie'] || '' // クライアントからの Cookie を透過
-    }
+      "User-Agent": "Mozilla/5.0 (compatible; YubikiriBrowser/1.0)",
+      "Accept": "*/*",
+      "Accept-Language": "ja,en;q=0.9",
+    },
   };
 
-  const proxyReq = client.request(options, (upstream) => {
-    res.status(upstream.statusCode);
+  const proxyReq = client.request(options, (proxyRes) => {
+    let body = [];
 
-    // 制限回避用 CORS ヘッダ
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Credentials', 'true');
+    proxyRes.on("data", (chunk) => body.push(chunk));
+    proxyRes.on("end", () => {
+      const buffer = Buffer.concat(body);
+      let contentType = proxyRes.headers["content-type"] || "";
 
-    // 上流の Content-Type, Cache などをコピー
-    if (upstream.headers['content-type']) {
-      res.set('Content-Type', upstream.headers['content-type']);
-    }
-    if (upstream.headers['cache-control']) {
-      res.set('Cache-Control', upstream.headers['cache-control']);
-    }
-    if (upstream.headers['set-cookie']) {
-      // Cookie 透過
-      res.set('Set-Cookie', upstream.headers['set-cookie']);
-    }
+      // ---- HTML の場合は書き換え ----
+      if (contentType.includes("text/html")) {
+        let html = buffer.toString("utf8");
 
-    let bodyChunks = [];
-    upstream.on('data', (chunk) => bodyChunks.push(chunk));
+        // <head> に <base> を注入（相対URL解決）
+        html = html.replace(
+          /<head([^>]*)>/i,
+          `<head$1><base href="${targetUrl.origin}">`
+        );
 
-    upstream.on('end', () => {
-      const buffer = Buffer.concat(bodyChunks);
-      const ct = upstream.headers['content-type'] || '';
+        // URL を proxy 経由に書き換え
+        html = html.replace(
+          /((src|href)=["'])(https?:\/\/[^"']+)/gi,
+          (match, prefix, _, url) => `${prefix}/proxy?url=${encodeURIComponent(url)}`
+        );
 
-      if (ct.includes('text/html')) {
-        let text = buffer.toString('utf8');
+        // セキュリティヘッダを削除
+        res.removeHeader("Content-Security-Policy");
+        res.removeHeader("X-Frame-Options");
 
-        // HTML 内リンク書き換え
-        text = text.replace(/(href|src)=["'](https?:\/\/[^"']+)["']/gi,
-          (m, attr, url) => `${attr}="/proxy?url=${encodeURIComponent(url)}"`);
-
-        // CSS 内の url(...) 書き換え
-        text = text.replace(/url\((['"]?)(https?:\/\/[^)'"]+)\1\)/gi,
-          (m, q, url) => `url(/proxy?url=${encodeURIComponent(url)})`);
-
-        return res.send(text);
-      } else if (ct.includes('text/css')) {
-        // CSS ファイル内の url(...) も置換
-        let css = buffer.toString('utf8');
-        css = css.replace(/url\((['"]?)(https?:\/\/[^)'"]+)\1\)/gi,
-          (m, q, url) => `url(/proxy?url=${encodeURIComponent(url)})`);
-        return res.send(css);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.status(proxyRes.statusCode).send(html);
       } else {
-        // 画像や JS などはバイナリ転送
-        return res.send(buffer);
+        // HTML 以外はそのまま返す
+        res.setHeader("Content-Type", contentType);
+        res.status(proxyRes.statusCode).send(buffer);
       }
     });
   });
 
-  proxyReq.on('error', (err) => {
-    console.error('[proxy] error:', err.message);
-    res.status(502).send('Upstream fetch error: ' + err.message);
+  proxyReq.on("error", (err) => {
+    console.error("Proxy error:", err.message);
+    res.status(500).send("Proxy request failed");
   });
 
   proxyReq.end();
 });
 
-module.exports = router;
+app.listen(PORT, () => {
+  console.log(`✅ Proxy running at http://localhost:${PORT}`);
+});
