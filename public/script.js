@@ -1,8 +1,13 @@
-document.getElementById("proxyForm").addEventListener("submit", (e) => {
+const form = document.getElementById("proxyForm");
+const input = document.getElementById("urlInput");
+const iframeContainer = document.querySelector(".iframe-container");
+const iframe = document.getElementById("proxyFrame");
+
+form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const url = document.getElementById("urlInput").value;
-  if (url) {
-    document.getElementById("proxyFrame").src = "/proxy?url=" + encodeURIComponent(url);
-    document.querySelector(".iframe-container").style.display = "block";
-  }
+  const url = input.value.trim();
+  if (!url) return;
+
+  iframe.src = "/proxy?url=" + encodeURIComponent(url);
+  iframeContainer.style.display = "block";
 });
