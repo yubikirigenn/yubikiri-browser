@@ -1,5 +1,5 @@
 const form = document.getElementById('proxyForm');
-const iframe = document.getElementById('resultFrame');
+const result = document.getElementById('result');
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -10,10 +10,9 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
-  // http/https が無ければ自動で付与
   if (!/^https?:\/\//i.test(url)) {
     url = 'https://' + url;
   }
 
-  iframe.src = `/proxy?url=${encodeURIComponent(url)}`;
+  result.innerHTML = `<iframe src="/proxy?url=${encodeURIComponent(url)}" width="100%" height="600" frameborder="0"></iframe>`;
 });
