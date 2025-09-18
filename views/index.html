@@ -9,10 +9,12 @@
   <div class="container">
     <h1>Yubikiri Proxy</h1>
     <form id="proxyForm">
-      <input type="text" id="url" placeholder="URLを入力" required>
+      <input type="text" id="url" placeholder="https://example.com" required>
       <button type="submit">アクセス</button>
     </form>
-    <iframe id="resultFrame"></iframe>
+    <div id="result">
+      <!-- ここに結果が読み込まれる -->
+    </div>
   </div>
   <script src="/script.js"></script>
 </body>
