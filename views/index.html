@@ -3,18 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <title>Hello</title>
-  <link rel="stylesheet" href="/style.css">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+    }
+    .container {
+      text-align: center;
+    }
+    input[type="text"] {
+      width: 400px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-left: 5px;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
     <h1>Hello</h1>
-    <form id="goForm">
-      <input type="text" name="url" id="url" placeholder="URLを入力">
-      <button type="submit">GO</button>
+    <!-- GET メソッドで /proxy に直接飛ばす -->
+    <form action="/proxy" method="get">
+      <input type="text" name="url" placeholder="Enter URL">
+      <button type="submit">Go</button>
     </form>
-    <iframe id="result" sandbox="allow-same-origin allow-scripts"></iframe>
   </div>
-
-  <script src="/script.js"></script>
 </body>
 </html>
