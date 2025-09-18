@@ -28,14 +28,18 @@ app.get("/proxy", async (req, res) => {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "Accept-Language": "ja,en;q=0.9",
         Accept: "*/*",
       },
       followAllRedirects: true,
+      jar: true,
+      // 必要に応じて外部プロキシを使う場合:
+      // proxy: "http://user:pass@ip:port"
     });
 
     const $ = cheerio.load(html);
 
-    // リンク・リソースを書き換え
+    // リンクやリソースを書き換え
     const rewriteAttr = (selector, attr) => {
       $(selector).each((_, el) => {
         const val = $(el).attr(attr);
