@@ -1,6 +1,7 @@
 {
-  "name": "proxy-app",
-  "version": "2.0.0",
+  "name": "yubikiri-proxy",
+  "version": "1.0.0",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -9,6 +10,5 @@
     "express": "^4.18.2",
     "node-fetch": "^3.3.2",
     "cheerio": "^1.0.0-rc.12"
-  },
-  "type": "module"
+  }
 }
