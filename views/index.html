@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
   <title>Yubikiri Proxy</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <div class="container">
     <h1>Yubikiri Proxy</h1>
-    <form id="proxyForm">
+    <form id="proxyForm" action="javascript:void(0);"> <!-- action を無害に -->
       <input type="text" id="url" placeholder="https://example.com" required>
-      <button type="submit">アクセス</button>
+      <button type="button" id="goBtn">Go</button> <!-- type=button にする -->
     </form>
     <div id="result"></div>
   </div>
-  <script src="/shadow-loader.js"></script>
+
+  <!-- スクリプトはページ末尾で読み込む -->
   <script src="/script.js"></script>
 </body>
 </html>
