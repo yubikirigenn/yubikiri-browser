@@ -1,13 +1,21 @@
-// public/script.js
+// public/script.js (変更)
 const form = document.getElementById('proxyForm');
-const goBtn = document.getElementById('goBtn');
+const goBtn = document.getElementById('goBtn') || document.getElementById('go'); // もし id 名が違えば対応
 const urlInput = document.getElementById('url');
 const result = document.getElementById('result');
 
-let currentBlobUrl = null;
-
 function showError(msg) {
   result.innerHTML = `<div style="color:#b00;padding:12px;background:#fee;border-radius:4px;">${msg}</div>`;
+}
+
+function createIframeForProxy(targetUrl) {
+  // create iframe which points to our server-side /proxy endpoint directly
+  const iframe = document.createElement('iframe');
+  iframe.style.width = '100%';
+  iframe.style.height = '80vh';
+  iframe.style.border = '0';
+  iframe.src = `/proxy?url=${encodeURIComponent(targetUrl)}&_=${Date.now()}`; // cache-bust
+  return iframe;
 }
 
 async function loadUrl(rawUrl) {
@@ -19,57 +27,43 @@ async function loadUrl(rawUrl) {
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
   result.innerHTML = '<div style="padding:12px">読み込み中…</div>';
-  goBtn.disabled = true;
+  if (goBtn) goBtn.disabled = true;
 
   try {
-    const res = await fetch(`/proxy?url=${encodeURIComponent(url)}`, { method: 'GET' });
-    if (!res.ok) throw new Error(`proxy error ${res.status} ${res.statusText}`);
-
-    const html = await res.text();
-
-    // 既存 blob を解放
-    if (currentBlobUrl) {
-      try { URL.revokeObjectURL(currentBlobUrl); } catch (e) {}
-      currentBlobUrl = null;
-    }
-
-    const blob = new Blob([html], { type: 'text/html' });
-    currentBlobUrl = URL.createObjectURL(blob);
-
-    // iframe を作って blob を読み込ませる（これで X-Frame-Options の回避が期待できます）
+    // Instead of fetching HTML in client, we set iframe.src to /proxy so browser will request our server endpoint
+    // This reduces origin mismatches and lets the browser handle resource loading naturally.
     result.innerHTML = '';
-    const iframe = document.createElement('iframe');
-    iframe.src = currentBlobUrl;
-    iframe.style.width = '100%';
-    iframe.style.height = '80vh';
-    iframe.style.border = '0';
-    // 必要なら sandbox 属性を調整してください（ここは自由）
-    // iframe.setAttribute('sandbox', 'allow-scripts allow-forms');
-
-    // iframe の読み込み失敗をある程度検知（404のようなレスポンスは blob内のHTMLなので onload は呼ばれる）
-    iframe.addEventListener('error', () => {
-      showError('iframe の読み込みに失敗しました');
-    });
-
+    const iframe = createIframeForProxy(url);
     result.appendChild(iframe);
+
+    // optional: detect load or errors
+    iframe.addEventListener('load', () => {
+      // loaded (note: errors inside iframe won't trigger 'error' in many cases)
+      if (goBtn) goBtn.disabled = false;
+    });
+    // set a timeout fallback in case load never fires
+    setTimeout(() => { if (goBtn) goBtn.disabled = false; }, 20000);
   } catch (err) {
     console.error('loadUrl error:', err);
     showError('読み込み中にエラーが発生しました: ' + (err.message || err));
-  } finally {
-    goBtn.disabled = false;
+    if (goBtn) goBtn.disabled = false;
   }
 }
 
-// ボタンで明示的に起動（フォームのデフォルト送信を避ける）
-goBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  loadUrl(urlInput.value);
-});
-
-// もし Enter キーでの送信を有効にしたければ、input でキー検出して呼ぶ（下のコードをコメント解除）
-// urlInput.addEventListener('keydown', (e) => {
-//   if (e.key === 'Enter') {
-//     e.preventDefault();
-//     loadUrl(urlInput.value);
-//   }
-//});
+// attach to button or form
+const btn = document.getElementById('goBtn') || document.getElementById('go');
+if (btn) {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    loadUrl(urlInput.value);
+  });
+} else {
+  // fallback: form submit
+  const formEl = document.getElementById('proxyForm');
+  if (formEl) {
+    formEl.addEventListener('submit', (e) => {
+      e.preventDefault();
+      loadUrl(urlInput.value);
+    });
+  }
+}
