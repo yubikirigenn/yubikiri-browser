@@ -16,11 +16,11 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
-// サーバーサイドプロキシ（Cloudflare/JS チャレンジ対応）
+// サーバーサイドプロキシ
 app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) {
-    return res.status(400).json({ success: false, message: "URL パラメータが必要です" });
+    return res.send(`<h1>コンテンツ取得エラー</h1><p>URL パラメータが必要です</p>`);
   }
 
   try {
@@ -35,7 +35,7 @@ app.get("/proxy", async (req, res) => {
 
     const $ = cheerio.load(html);
 
-    // リンクやリソースを書き換え
+    // リンク・リソースを書き換え
     const rewriteAttr = (selector, attr) => {
       $(selector).each((_, el) => {
         const val = $(el).attr(attr);
@@ -53,7 +53,7 @@ app.get("/proxy", async (req, res) => {
     rewriteAttr("img", "src");
     rewriteAttr("form", "action");
 
-    // iframe 用にラップして返す
+    // iframe 用にラップ
     res.setHeader("Content-Type", "text/html");
     res.setHeader("X-Frame-Options", "ALLOWALL");
     res.setHeader("Content-Security-Policy", "frame-ancestors *");
@@ -72,8 +72,11 @@ ${$.html()}
 </html>
     `);
   } catch (err) {
-    // エラーは JSON で返す
-    res.status(500).json({ success: false, message: "コンテンツ取得エラー: " + err.message });
+    console.error("cloudscraper error:", err);
+    res.send(`
+      <h1>コンテンツ取得エラー</h1>
+      <p>${err.message}</p>
+    `);
   }
 });
 
