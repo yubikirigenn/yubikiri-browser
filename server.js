@@ -5,40 +5,44 @@ const path = require('path');
 
 const app = express();
 
-// CORS許可（フロントエンドからアクセス可能にする）
+// CORSを許可（フロントからアクセス可能にする）
 app.use(cors());
-
-// 静的ファイル提供
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 
-// プロキシエンドポイント（GitHub専用）
+// プロキシエンドポイント（任意のサイト）
 app.get('/proxy', async (req, res) => {
   try {
-    const { url } = req.query;
+    let { url } = req.query;
 
-    // GitHubのみアクセス可能
-    if (!url || !url.startsWith('https://github.com')) {
-      return res.status(400).send('Invalid URL');
+    if (!url) return res.status(400).send('URLを入力してください');
+
+    url = url.trim();
+
+    // http/https が無ければ https:// を補完
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
     }
 
     const response = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      responseType: 'arraybuffer' // 画像やバイナリにも対応
     });
 
+    // コンテンツタイプをそのまま返す
+    res.set('Content-Type', response.headers['content-type'] || 'text/html');
     res.send(response.data);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Error fetching the page');
+    res.status(500).send('サイトの取得に失敗しました');
   }
 });
 
-// GitHub Pages 風に index.html も提供
+// index.html を返す
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
-// ポート設定
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`yubikiri-proxy running on port ${port}`);
