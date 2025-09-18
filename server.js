@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ルートで index.html を返す
+// ルートで index.html
 app.get('/', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'views', 'index.html'));
 });
