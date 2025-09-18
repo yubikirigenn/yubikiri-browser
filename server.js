@@ -1,47 +1,42 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const path = require('path');
+const cors = require('cors');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// 静的ファイル (CSS / JS)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cors());
+app.use(express.static('public'));
 
-// HTMLを書き換えて返すプロキシ
+// プロキシルート
 app.get('/proxy', async (req, res) => {
-  let url = req.query.url;
-  if (!url) return res.status(400).send('URLが必要です');
-  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  const targetUrl = req.query.url;
+  if (!targetUrl) return res.status(400).send('URL is required');
 
   try {
-    const response = await axios.get(url, { responseType: 'text' });
+    const response = await axios.get(targetUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+
     const $ = cheerio.load(response.data);
 
-    // a, link, script, img のパスを /proxy 経由に書き換え
-    $('a[href], link[href], script[src], img[src]').each((i, el) => {
-      const attr = el.name === 'a' || el.name === 'link' ? 'href' : 'src';
-      const value = $(el).attr(attr);
-      if (value) {
-        const abs = new URL(value, url).toString();
-        $(el).attr(attr, `/proxy?url=${encodeURIComponent(abs)}`);
+    // リソースのURLを /proxy 経由に書き換え
+    $('a, img, script, link').each((i, el) => {
+      const attr = $(el).attr('href') ? 'href' : 'src';
+      const val = $(el).attr(attr);
+      if (val && !val.startsWith('data:') && !val.startsWith('javascript:')) {
+        const absoluteUrl = new URL(val, targetUrl).href;
+        $(el).attr(attr, `/proxy?url=${encodeURIComponent(absoluteUrl)}`);
       }
     });
 
-    res.set('Content-Type', 'text/html; charset=utf-8');
     res.send($.html());
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('取得に失敗しました');
+    res.status(500).send(`Error fetching ${targetUrl}: ${err.message}`);
   }
 });
 
-// トップページ
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
-});
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Yubikiri Proxy running on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Proxy running at http://localhost:${PORT}`);
 });
