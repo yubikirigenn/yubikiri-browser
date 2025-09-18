@@ -1,13 +1,12 @@
 {
-  "name": "yubikiri-proxy",
-  "version": "9.0.0",
+  "name": "yubikiri-proxy-new",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "cheerio": "^1.0.0-rc.12",
     "cloudscraper": "^1.2.0"
   }
 }
