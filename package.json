@@ -1,12 +1,14 @@
 {
-  "name": "yubikiri-browser",
-  "version": "1.0.0",
-  "type": "module",
+  "name": "proxy-app",
+  "version": "2.0.0",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "axios": "^1.6.3"  
-  }
+    "node-fetch": "^3.3.2",
+    "cheerio": "^1.0.0-rc.12"
+  },
+  "type": "module"
 }
