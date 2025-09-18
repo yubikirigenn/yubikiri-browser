@@ -1,6 +1,6 @@
 import express from "express";
 import fetch from "node-fetch";
-import * as cheerio from "cheerio"; // ← 修正！
+import * as cheerio from "cheerio";
 import path from "path";
 import { fileURLToPath } from "url";
 import { URL } from "url";
@@ -13,24 +13,30 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
+// トップページ（検索UI）
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
+// サーバーサイドプロキシ
 app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
-  if (!targetUrl) {
-    return res.status(400).send("Missing url parameter");
-  }
+  if (!targetUrl) return res.status(400).send("Missing url parameter");
+
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Referer": targetUrl
+  };
 
   try {
-    const response = await fetch(targetUrl);
+    const response = await fetch(targetUrl, { headers, redirect: "follow", timeout: 15000 });
     const contentType = response.headers.get("content-type") || "";
 
-    // HTML の場合だけ書き換え
     if (contentType.includes("text/html")) {
       const html = await response.text();
-      const $ = cheerio.load(html); // そのまま使える
+      const $ = cheerio.load(html);
 
       const rewriteAttr = (selector, attr) => {
         $(selector).each((_, el) => {
@@ -54,7 +60,6 @@ app.get("/proxy", async (req, res) => {
       res.setHeader("Content-Type", "text/html");
       res.send($.html());
     }
-    // CSS の場合
     else if (contentType.includes("text/css")) {
       let css = await response.text();
       css = css.replace(/url\((.*?)\)/g, (match, p1) => {
@@ -67,17 +72,15 @@ app.get("/proxy", async (req, res) => {
       res.setHeader("Content-Type", "text/css");
       res.send(css);
     }
-    // その他
     else {
       const buffer = Buffer.from(await response.arrayBuffer());
       res.setHeader("Content-Type", contentType);
       res.send(buffer);
     }
+
   } catch (err) {
     res.status(500).send("Proxy error: " + err.message);
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`yubikiri-proxy running at http://localhost:${PORT}`));
