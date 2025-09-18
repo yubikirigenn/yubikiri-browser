@@ -1,21 +1,24 @@
-const express = require("express");
-const path = require("path");
-const proxy = require("./proxy");
+// server.js
+const express = require('express');
+const path = require('path');
+const proxyRouter = require('./proxy');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(express.static(path.join(__dirname, "public")));
-app.set("views", path.join(__dirname, "views"));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ルート
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views/index.html"));
+// index
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
-// プロキシ本体
-proxy(app);
+// mount proxy router at /proxy
+app.use('/proxy', proxyRouter);
+
+// small health
+app.get('/_health', (req, res) => res.send('ok'));
 
 app.listen(PORT, () => {
-  console.log(`✅ Proxy running at http://localhost:${PORT}`);
+  console.log(`✅ yubikiri-proxy running at http://localhost:${PORT}`);
 });
