@@ -30,14 +30,29 @@ app.get("/proxy", async (req, res) => {
     "Referer": targetUrl
   };
 
-  try {
-    const response = await fetch(targetUrl, { headers, redirect: "follow", timeout: 15000 });
-    const contentType = response.headers.get("content-type") || "";
+  const MAX_RETRIES = 3;
+  let attempt = 0;
+  let response;
 
+  while (attempt < MAX_RETRIES) {
+    try {
+      response = await fetch(targetUrl, { headers, redirect: "follow", timeout: 15000 });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      break;
+    } catch (err) {
+      attempt++;
+      if (attempt >= MAX_RETRIES) return res.status(500).send("Proxy error: " + err.message);
+    }
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+
+  try {
     if (contentType.includes("text/html")) {
       const html = await response.text();
       const $ = cheerio.load(html);
 
+      // HTML 内リンク書き換え
       const rewriteAttr = (selector, attr) => {
         $(selector).each((_, el) => {
           const val = $(el).attr(attr);
@@ -77,9 +92,8 @@ app.get("/proxy", async (req, res) => {
       res.setHeader("Content-Type", contentType);
       res.send(buffer);
     }
-
   } catch (err) {
-    res.status(500).send("Proxy error: " + err.message);
+    res.status(500).send("Proxy processing error: " + err.message);
   }
 });
 
