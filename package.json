@@ -7,6 +7,6 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "node-fetch": "^2.7.0"   // fetch互換APIをCJSで使えるように追加
+    "node-fetch": "^2.7.0"   
   }
 }
