@@ -1,25 +1,21 @@
-import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
-import proxyRouter from "./proxy.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require("express");
+const path = require("path");
+const proxy = require("./proxy");
 
 const app = express();
+const PORT = process.env.PORT || 10000;
 
-// 静的ファイル (public フォルダ)
 app.use(express.static(path.join(__dirname, "public")));
+app.set("views", path.join(__dirname, "views"));
 
-// プロキシ API
-app.use("/proxy", proxyRouter);
-
-// index.html
+// ルート
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "index.html"));
+  res.sendFile(path.join(__dirname, "views/index.html"));
 });
 
-const PORT = process.env.PORT || 3000;
+// プロキシ本体
+proxy(app);
+
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`✅ Proxy running at http://localhost:${PORT}`);
 });
