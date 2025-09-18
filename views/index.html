@@ -1,41 +1,22 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Hello</title>
-  <style>
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-    }
-    .container {
-      text-align: center;
-    }
-    input[type="text"] {
-      width: 400px;
-      padding: 10px;
-      font-size: 16px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-left: 5px;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>yubikiri-proxy</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Hello</h1>
-    <!-- GET メソッドで /proxy に直接飛ばす -->
-    <form action="/proxy" method="get">
-      <input type="text" name="url" placeholder="Enter URL">
+  <div class="main-container">
+    <h1 class="logo">yubikiri-proxy</h1>
+    <form id="proxyForm" class="search-form">
+      <input type="text" id="urlInput" placeholder="URLを入力してください" />
       <button type="submit">Go</button>
     </form>
+    <div class="iframe-container">
+      <iframe id="proxyFrame" src="" frameborder="0"></iframe>
+    </div>
   </div>
+  <script src="/script.js"></script>
 </body>
 </html>
