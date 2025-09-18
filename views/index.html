@@ -2,15 +2,17 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>yubikiri-proxy-new</title>
+  <title>Yubikiri Proxy</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div id="container">
-    <h1>yubikiri-proxy-new</h1>
-    <input type="text" id="url-input" placeholder="URLを入力" />
-    <button id="go-btn">Go</button>
-    <iframe id="proxy-frame"></iframe>
+  <div class="container">
+    <h1>Yubikiri Proxy</h1>
+    <form id="proxyForm">
+      <input type="text" id="url" placeholder="GitHubのURLを入力" required>
+      <button type="submit">アクセス</button>
+    </form>
+    <iframe id="resultFrame"></iframe>
   </div>
   <script src="/script.js"></script>
 </body>
