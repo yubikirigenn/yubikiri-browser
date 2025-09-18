@@ -2,23 +2,16 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>yubikiri-proxy</title>
+  <title>Yubikiri Browser</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header>
-    <h1>🔗 yubikiri-proxy</h1>
-    <form id="proxy-form">
-      <input type="text" id="url-input" placeholder="https://example.com">
-      <button type="submit">Go</button>
-    </form>
-  </header>
-  <iframe id="proxy-frame"></iframe>
+  <div class="toolbar">
+    <input type="text" id="urlInput" placeholder="Enter URL...">
+    <button id="goBtn">Go</button>
+  </div>
+  <iframe id="browserFrame" src="" frameborder="0"></iframe>
+
   <script src="/script.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js");
-    }
-  </script>
 </body>
 </html>
