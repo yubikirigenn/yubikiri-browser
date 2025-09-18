@@ -1,7 +1,7 @@
 const form = document.getElementById('proxyForm');
 const result = document.getElementById('result');
 
-form.addEventListener('submit', (e) => {
+form.addEventListener('submit', async (e) => {
   e.preventDefault();
   let url = document.getElementById('url').value.trim();
 
@@ -14,5 +14,13 @@ form.addEventListener('submit', (e) => {
     url = 'https://' + url;
   }
 
-  result.innerHTML = `<iframe src="/proxy?url=${encodeURIComponent(url)}" width="100%" height="600" frameborder="0"></iframe>`;
+  result.innerHTML = "読み込み中...";
+
+  try {
+    const res = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
+    const html = await res.text();
+    result.innerHTML = html;
+  } catch (err) {
+    result.innerHTML = "エラー: " + err.message;
+  }
 });
