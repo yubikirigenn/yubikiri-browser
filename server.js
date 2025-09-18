@@ -1,49 +1,56 @@
 const express = require('express');
 const axios = require('axios');
-const cors = require('cors');
-const path = require('path');
-
+const cheerio = require('cheerio');
 const app = express();
 
-// CORSを許可（フロントからアクセス可能にする）
-app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true }));
-
-// プロキシエンドポイント（任意のサイト）
+// URLを受け取り、書き換えて返す
 app.get('/proxy', async (req, res) => {
+  let url = req.query.url;
+  if (!url) return res.status(400).send('URLが必要です');
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
   try {
-    let { url } = req.query;
+    const response = await axios.get(url, { responseType: 'text' });
 
-    if (!url) return res.status(400).send('URLを入力してください');
+    // HTMLを読み込み
+    let html = response.data;
+    const $ = cheerio.load(html);
 
-    url = url.trim();
-
-    // http/https が無ければ https:// を補完
-    if (!/^https?:\/\//i.test(url)) {
-      url = 'https://' + url;
-    }
-
-    const response = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      responseType: 'arraybuffer' // 画像やバイナリにも対応
+    // リンクや画像・スクリプトを全部 /proxy 経由に書き換える
+    $('a[href], link[href], script[src], img[src]').each((i, el) => {
+      const attr = el.name === 'a' || el.name === 'link' ? 'href' : 'src';
+      const value = $(el).attr(attr);
+      if (value) {
+        const abs = new URL(value, url).toString();
+        $(el).attr(attr, `/proxy?url=${encodeURIComponent(abs)}`);
+      }
     });
 
-    // コンテンツタイプをそのまま返す
-    res.set('Content-Type', response.headers['content-type'] || 'text/html');
-    res.send(response.data);
+    // レスポンスを返す（ヘッダ制限を削除）
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send($.html());
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('サイトの取得に失敗しました');
+    res.status(500).send('取得に失敗しました');
   }
 });
 
-// index.html を返す
+// トップページ
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
+  res.send(`
+    <html>
+      <head><title>Yubikiri Proxy</title></head>
+      <body>
+        <h1>Yubikiri Proxy</h1>
+        <form action="/proxy" method="get">
+          <input type="text" name="url" placeholder="https://example.com" style="width:300px">
+          <button type="submit">Go</button>
+        </form>
+      </body>
+    </html>
+  `);
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`yubikiri-proxy running on port ${port}`);
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Yubikiri Proxy running');
 });
