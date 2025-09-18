@@ -1,12 +1,9 @@
-const form = document.getElementById("proxy-form");
 const input = document.getElementById("url-input");
+const btn = document.getElementById("go-btn");
 const iframe = document.getElementById("proxy-frame");
 
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
+btn.addEventListener("click", () => {
   const url = input.value.trim();
   if (!url) return;
-
-  iframe.style.display = "block";
   iframe.src = `/proxy?url=${encodeURIComponent(url)}`;
 });
