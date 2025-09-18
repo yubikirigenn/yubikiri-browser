@@ -1,6 +1,6 @@
 body {
   font-family: Arial, sans-serif;
-  background: #f0f0f0;
+  background: #f9f9f9;
   margin: 0;
   padding: 0;
 }
@@ -19,6 +19,7 @@ input {
 
 button {
   padding: 0.5rem 1rem;
+  cursor: pointer;
 }
 
 iframe {
@@ -26,4 +27,5 @@ iframe {
   height: 600px;
   margin-top: 1rem;
   border: 1px solid #ccc;
+  background: #fff;
 }
