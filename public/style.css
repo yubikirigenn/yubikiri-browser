@@ -22,7 +22,19 @@ button {
   cursor: pointer;
 }
 
+/* プロキシ結果の領域 */
 #result {
+  all: initial;          /* 親ページの CSS 影響をリセット */
+  display: block;
+  position: relative;
   margin-top: 1rem;
-  text-align: left;
+  height: 80vh;          /* 高さ固定でスクロール可能 */
+  overflow: auto;
+  border: 1px solid #ccc;
+  padding: 10px;
+  background: #fff;
+}
+
+#result * {
+  box-sizing: border-box;
 }
