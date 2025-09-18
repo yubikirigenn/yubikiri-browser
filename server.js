@@ -1,26 +1,22 @@
 import express from "express";
-import * as cheerio from "cheerio";
 import cloudscraper from "cloudscraper";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static(path.join(__dirname, "public")));
+// 静的ファイル提供
+app.use(express.static("public"));
 
+// ホームページ
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "index.html"));
+  res.sendFile("index.html", { root: "views" });
 });
 
 // サーバーサイドプロキシ
 app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) {
-    return res.send(`<h1>コンテンツ取得エラー</h1><p>URL パラメータが必要です</p>`);
+    return res.send("<h2>URLを指定してください</h2>");
   }
 
   try {
@@ -28,62 +24,23 @@ app.get("/proxy", async (req, res) => {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
-        "Accept-Language": "ja,en;q=0.9",
         Accept: "*/*",
+        "Accept-Language": "ja,en;q=0.9",
       },
       followAllRedirects: true,
       jar: true,
-      // 必要に応じて外部プロキシを使う場合:
-      // proxy: "http://user:pass@ip:port"
+      // proxy: "http://user:pass@ip:port" // 必要なら設定
     });
 
-    const $ = cheerio.load(html);
-
-    // リンクやリソースを書き換え
-    const rewriteAttr = (selector, attr) => {
-      $(selector).each((_, el) => {
-        const val = $(el).attr(attr);
-        if (!val) return;
-        try {
-          const absUrl = new URL(val, targetUrl).href;
-          $(el).attr(attr, `/proxy?url=${encodeURIComponent(absUrl)}`);
-        } catch {}
-      });
-    };
-
-    rewriteAttr("a", "href");
-    rewriteAttr("link", "href");
-    rewriteAttr("script", "src");
-    rewriteAttr("img", "src");
-    rewriteAttr("form", "action");
-
-    // iframe 用にラップ
-    res.setHeader("Content-Type", "text/html");
     res.setHeader("X-Frame-Options", "ALLOWALL");
     res.setHeader("Content-Security-Policy", "frame-ancestors *");
-
-    res.send(`
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<title>yubikiri-proxy iframe</title>
-<style>body{margin:0;padding:0;}</style>
-</head>
-<body>
-${$.html()}
-</body>
-</html>
-    `);
+    res.send(html);
   } catch (err) {
-    console.error("cloudscraper error:", err);
-    res.send(`
-      <h1>コンテンツ取得エラー</h1>
-      <p>${err.message}</p>
-    `);
+    console.error(err);
+    res.send(`<h2>コンテンツ取得エラー</h2><p>${err.message}</p>`);
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`yubikiri-proxy running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
