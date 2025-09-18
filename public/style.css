@@ -1,67 +1,41 @@
-body {
+body, html {
   margin: 0;
   padding: 0;
-  font-family: "Segoe UI", sans-serif;
-  background: #f8f9fa;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+  height: 100%;
+  font-family: Arial, sans-serif;
 }
 
-.top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+header {
+  text-align: center;
+  padding: 20px;
+  background-color: #f8f8f8;
   z-index: 10;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #4285f4;
-}
-
-.search-form {
-  display: flex;
-  gap: 5px;
-  flex: 1;
-}
-
-.search-form input {
-  flex: 1;
-  padding: 8px 12px;
-  border-radius: 25px;
-  border: 1px solid #dcdcdc;
-  font-size: 14px;
-  outline: none;
-}
-
-.search-form button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 25px;
-  background: #4285f4;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.search-form button:hover {
-  background: #3367d6;
-}
-
-#iframeFrame, iframe#proxyFrame {
-  flex: 1;
+  position: fixed;
+  top: 0;
   width: 100%;
-  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-iframe {
-  flex: 1;
+
+#proxy-form {
+  margin-top: 10px;
+}
+
+#url-input {
+  width: 400px;
+  padding: 5px;
+}
+
+#message {
+  color: red;
+  margin-top: 10px;
+}
+
+#proxy-frame {
+  position: absolute;
+  top: 100px; /* header + form の高さに合わせる */
+  left: 0;
   width: 100%;
-  height: calc(100vh - 60px); /* top-bar分を引く */
+  bottom: 0;
+  border: none;
+  display: none;
 }
