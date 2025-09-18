@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <title>Yubikiri Proxy</title>
+  <meta charset="UTF-8">
+  <title>yubikiri-proxy</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Yubikiri Proxy</h1>
-    <form id="proxyForm" action="javascript:void(0);"> <!-- action を無害に -->
-      <input type="text" id="url" placeholder="https://example.com" required>
-      <button type="button" id="goBtn">Go</button> <!-- type=button にする -->
+  <header>
+    <h1>🔗 yubikiri-proxy</h1>
+    <form id="proxy-form">
+      <input type="text" id="url-input" placeholder="https://example.com">
+      <button type="submit">Go</button>
     </form>
-    <div id="result"></div>
-  </div>
-
-  <!-- スクリプトはページ末尾で読み込む -->
+  </header>
+  <iframe id="proxy-frame"></iframe>
   <script src="/script.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js");
+    }
+  </script>
 </body>
 </html>
