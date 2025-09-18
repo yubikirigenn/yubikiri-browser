@@ -22,19 +22,12 @@ button {
   cursor: pointer;
 }
 
-/* プロキシ結果の領域 */
+/* Shadow DOM 内での結果は独立するため、ここでは最小限 */
 #result {
-  all: initial;          /* 親ページの CSS 影響をリセット */
   display: block;
-  position: relative;
   margin-top: 1rem;
-  height: 80vh;          /* 高さ固定でスクロール可能 */
-  overflow: auto;
+  height: 80vh;
   border: 1px solid #ccc;
-  padding: 10px;
+  overflow: auto;
   background: #fff;
-}
-
-#result * {
-  box-sizing: border-box;
 }
