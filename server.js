@@ -8,11 +8,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ルート (/) で index.html を返す
+// ルートで index.html を返す
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
+  res.sendFile(path.resolve(__dirname, 'views', 'index.html'));
 });
 
 // プロキシルート
@@ -27,7 +27,7 @@ app.get('/proxy', async (req, res) => {
 
     const $ = cheerio.load(response.data);
 
-    // リソースのURLを /proxy 経由に書き換え
+    // a, img, script, link の URL を /proxy 経由に書き換え
     $('a, img, script, link').each((i, el) => {
       const attr = $(el).attr('href') ? 'href' : 'src';
       const val = $(el).attr(attr);
@@ -37,6 +37,7 @@ app.get('/proxy', async (req, res) => {
       }
     });
 
+    res.set('Content-Type', 'text/html; charset=utf-8');
     res.send($.html());
   } catch (err) {
     res.status(500).send(`Error fetching ${targetUrl}: ${err.message}`);
@@ -44,5 +45,5 @@ app.get('/proxy', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Proxy running at http://localhost:${PORT}`);
+  console.log(`✅ yubikiri-proxy running at http://localhost:${PORT}`);
 });
