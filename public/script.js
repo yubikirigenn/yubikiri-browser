@@ -1,7 +1,8 @@
-document.getElementById("goBtn").addEventListener("click", () => {
-  const url = document.getElementById("urlInput").value.trim();
-  if (!url) return;
+async function fetchPage() {
+  const url = encodeURIComponent('https://www.amazon.co.jp/');
+  const res = await fetch(`/proxy?url=${url}`);
+  const html = await res.text();
+  document.getElementById('content').innerHTML = html;
+}
 
-  const frame = document.getElementById("browserFrame");
-  frame.src = "/proxy?url=" + encodeURIComponent(url);
-});
+fetchPage();
