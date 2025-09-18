@@ -1,20 +1,7 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>yubikiri-proxy</title>
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <div class="top-bar">
-    <h1 class="logo">yubikiri-proxy</h1>
-    <form id="proxyForm" class="search-form">
-      <input type="text" id="urlInput" placeholder="URLを入力してください" required />
-      <button type="submit">Go</button>
-    </form>
-  </div>
-  <iframe id="proxyFrame" src="" frameborder="0"></iframe>
-  <script src="/script.js"></script>
-</body>
-</html>
+<form id="proxy-form">
+  <input type="text" id="url-input" placeholder="URLを入力" />
+  <button type="submit">Go</button>
+</form>
+
+<div id="message" style="color: red; text-align: center; margin-top: 10px;"></div>
+<iframe id="proxy-frame" style="width: 100%; height: 90vh; border: none; display: none;"></iframe>
