@@ -1,9 +1,14 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const path = require('path');
+
 const app = express();
 
-// URLを受け取り、書き換えて返す
+// 静的ファイル (CSS / JS)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// HTMLを書き換えて返すプロキシ
 app.get('/proxy', async (req, res) => {
   let url = req.query.url;
   if (!url) return res.status(400).send('URLが必要です');
@@ -11,12 +16,9 @@ app.get('/proxy', async (req, res) => {
 
   try {
     const response = await axios.get(url, { responseType: 'text' });
+    const $ = cheerio.load(response.data);
 
-    // HTMLを読み込み
-    let html = response.data;
-    const $ = cheerio.load(html);
-
-    // リンクや画像・スクリプトを全部 /proxy 経由に書き換える
+    // a, link, script, img のパスを /proxy 経由に書き換え
     $('a[href], link[href], script[src], img[src]').each((i, el) => {
       const attr = el.name === 'a' || el.name === 'link' ? 'href' : 'src';
       const value = $(el).attr(attr);
@@ -26,7 +28,6 @@ app.get('/proxy', async (req, res) => {
       }
     });
 
-    // レスポンスを返す（ヘッダ制限を削除）
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send($.html());
   } catch (err) {
@@ -37,20 +38,10 @@ app.get('/proxy', async (req, res) => {
 
 // トップページ
 app.get('/', (req, res) => {
-  res.send(`
-    <html>
-      <head><title>Yubikiri Proxy</title></head>
-      <body>
-        <h1>Yubikiri Proxy</h1>
-        <form action="/proxy" method="get">
-          <input type="text" name="url" placeholder="https://example.com" style="width:300px">
-          <button type="submit">Go</button>
-        </form>
-      </body>
-    </html>
-  `);
+  res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log('Yubikiri Proxy running');
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Yubikiri Proxy running on port ${port}`);
 });
