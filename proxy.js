@@ -1,6 +1,5 @@
 // proxy.js
 import express from "express";
-import fetch from "node-fetch"; // 追加
 
 const router = express.Router();
 
@@ -12,6 +11,7 @@ router.get("/", async (req, res) => {
   }
 
   try {
+    // Node.js 22 なら fetch はグローバルに使える
     const response = await fetch(targetUrl, {
       headers: {
         "User-Agent":
@@ -21,11 +21,10 @@ router.get("/", async (req, res) => {
       },
     });
 
-    // Content-Type をそのまま渡す
     res.set("Content-Type", response.headers.get("content-type"));
     const body = await response.text();
 
-    // 制限回避: HTML 内の URL を自分の proxy に書き換える
+    // 制限回避: すべての URL を自分の proxy 経由に書き換え
     const proxied = body.replace(
       /(https?:\/\/[^\s"'<>]+)/g,
       (match) => `/proxy?url=${encodeURIComponent(match)}`
@@ -34,7 +33,7 @@ router.get("/", async (req, res) => {
     res.send(proxied);
   } catch (err) {
     console.error("Proxy error:", err);
-    res.status(500).send("Proxy fetch failed");
+    res.status(500).send("Proxy fetch failed: " + err.message);
   }
 });
 
