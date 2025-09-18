@@ -1,10 +1,4 @@
-// proxy.js
-// 強化版プロキシ：
-// - HTML/CSS/JS 内の URL を /r?url=... に徹底的に書き換え
-// - リソース取得時にリダイレクトチェーンを手動追跡（最大 20）
-// - 元サイトの CSP / X-Frame-Options 等の制限ヘッダをブラウザに渡さない
-// - CSS 内 @import / url() の書き換え強化、inline script の簡易 URL 書き換え
-
+// proxy.js — 上書き
 const axios = require('axios');
 const cheerio = require('cheerio');
 
@@ -23,68 +17,56 @@ function proxifyUrl(raw, base) {
   }
 }
 
-// 手動でリダイレクトを追跡して最終レスポンスを返すヘルパー
-async function fetchFollow(url, opts = {}) {
+async function fetchFollowWithChain(url, opts = {}) {
+  const chain = [];
   let cur = url;
-  let resp = null;
   for (let i = 0; i < MAX_FOLLOW; i++) {
     try {
-      // maxRedirects:0 -> axios won't follow. we check status and location ourselves.
-      resp = await axios.get(cur, {
+      const resp = await axios.get(cur, {
         responseType: opts.responseType || 'arraybuffer',
         headers: Object.assign({ 'User-Agent': USER_AGENT }, opts.headers || {}),
         timeout: opts.timeout || 30000,
         maxRedirects: 0,
-        validateStatus: status => (status >= 200 && status < 400) // accept 3xx for manual handling
+        validateStatus: status => (status >= 200 && status < 400)
       });
-    } catch (err) {
-      // axios throws for network errors or for status outside validateStatus
-      if (err && err.response && (err.response.status >= 300 && err.response.status < 400) && err.response.headers && err.response.headers.location) {
-        // handle like below
-        resp = err.response;
-      } else {
-        throw err;
-      }
-    }
-
-    if (!resp) throw new Error('No response');
-
-    // if it's a redirect (3xx) and location present -> follow
-    if (resp.status >= 300 && resp.status < 400 && resp.headers && resp.headers.location) {
-      // resolve relative location against current URL
-      try {
+      chain.push({ url: cur, status: resp.status, location: resp.headers.location || null });
+      if (resp.status >= 300 && resp.status < 400 && resp.headers && resp.headers.location) {
         cur = new URL(resp.headers.location, cur).href;
-        continue; // follow next
-      } catch (e) {
-        // cannot resolve -> break and return this resp
-        break;
+        continue;
       }
+      return { resp, finalUrl: cur, chain };
+    } catch (err) {
+      // axios may throw but include response on 3xx in some cases
+      if (err && err.response && err.response.status >= 300 && err.response.status < 400 && err.response.headers && err.response.headers.location) {
+        chain.push({ url: cur, status: err.response.status, location: err.response.headers.location || null });
+        cur = new URL(err.response.headers.location, cur).href;
+        continue;
+      }
+      // real error: return error and chain for debug
+      return { error: err, chain };
     }
-
-    // not a redirect -> return resp and final URL
-    return { resp, finalUrl: cur };
   }
-
-  // exceeded follow limit
-  return { resp, finalUrl: cur };
+  return { error: new Error('max redirects exceeded'), chain };
 }
 
-// HTML プロキシハンドラ
 async function html(req, res) {
   let target = req.query.url;
   if (!target) return res.status(400).send('URL is required');
   if (!/^https?:\/\//i.test(target)) target = 'https://' + target;
 
   try {
-    const { resp, finalUrl } = await fetchFollow(target, { responseType: 'text', headers: { Accept: 'text/html' }, timeout: 20000 });
+    const { resp, finalUrl, error, chain } = await fetchFollowWithChain(target, { responseType: 'text', headers: { Accept: 'text/html' }, timeout: 20000 });
+    if (error) {
+      console.error('fetchFollow error (html):', (error && (error.message || error)).toString());
+      console.error('fetch chain:', chain);
+      return res.status(502).send(`Upstream fetch error: ${error && (error.message || String(error))}`);
+    }
 
     const body = typeof resp.data === 'string' ? resp.data : resp.data.toString('utf8');
     const $ = cheerio.load(body, { decodeEntities: false });
 
-    // remove meta CSP / X-Frame-Options meta tags that may block things
     $('meta[http-equiv="Content-Security-Policy"], meta[name="content-security-policy"], meta[http-equiv="X-Frame-Options"], meta[name="x-frame-options"]').remove();
 
-    // rewrite href/src/srcset to /r?url=...
     $('[href]').each((i, el) => {
       const v = $(el).attr('href');
       if (v) $(el).attr('href', proxifyUrl(v, finalUrl));
@@ -107,7 +89,6 @@ async function html(req, res) {
       $(el).attr('srcset', parts.join(', '));
     });
 
-    // style tags: rewrite @import and url(...)
     $('style').each((i, el) => {
       let css = $(el).html() || '';
       css = css.replace(/@import\s+(?:url\()?['"]?(.*?)['"]?\)?\s*;/gi, (m, u) => {
@@ -115,23 +96,18 @@ async function html(req, res) {
         try {
           const abs = new URL(u, finalUrl).href;
           return `@import url("/r?url=${encodeURIComponent(abs)}");`;
-        } catch {
-          return m;
-        }
+        } catch { return m; }
       });
       css = css.replace(/url\((['"]?)(.*?)\1\)/g, (m, q, u) => {
         if (/^(data:|javascript:|#)/i.test(u)) return m;
         try {
           const abs = new URL(u, finalUrl).href;
           return `url(${q}/r?url=${encodeURIComponent(abs)}${q})`;
-        } catch {
-          return m;
-        }
+        } catch { return m; }
       });
       $(el).html(css);
     });
 
-    // inline style attributes: rewrite url(...)
     $('[style]').each((i, el) => {
       let style = $(el).attr('style') || '';
       style = style.replace(/url\((['"]?)(.*?)\1\)/g, (m, q, u) => {
@@ -139,67 +115,44 @@ async function html(req, res) {
         try {
           const abs = new URL(u, finalUrl).href;
           return `url(${q}/r?url=${encodeURIComponent(abs)}${q})`;
-        } catch {
-          return m;
-        }
+        } catch { return m; }
       });
       $(el).attr('style', style);
     });
 
-    // inline scripts: attempt to rewrite common absolute URLs used in fetch/import patterns
-    $('script:not([src])').each((i, el) => {
-      let js = $(el).html() || '';
-
-      // fetch('https://...') or fetch("https://...")
-      js = js.replace(/fetch\(\s*(['"`])(https?:\/\/[^'"]+)\1/g, (m, q, u) => {
-        return `fetch(${q}/r?url=${encodeURIComponent(u)}${q}`;
-      });
-
-      // import('https://...')
-      js = js.replace(/import\(\s*(['"`])(https?:\/\/[^'"]+)\1\s*\)/g, (m, q, u) => {
-        return `import(${q}/r?url=${encodeURIComponent(u)}${q})`;
-      });
-
-      // XHR open('GET', 'https://...')
-      js = js.replace(/open\(\s*(['"`]?(GET|POST|PUT|DELETE)['"`]?)\s*,\s*(['"`])(https?:\/\/[^'"]+)\3/gi, (m, method, m2, q, u) => {
-        return `open(${method}, ${q}/r?url=${encodeURIComponent(u)}${q}`;
-      });
-
-      $(el).html(js);
-    });
-
-    // Ensure <base> tag is present to help resolution inside iframe/srcdoc
     if ($('head base').length === 0) {
       $('head').prepend(`<base href="${finalUrl}">`);
     }
 
-    // Set our own headers (do NOT forward CSP/X-Frame headers from origin)
     res.set('Content-Type', 'text/html; charset=utf-8');
-    // Optional: allow framing from anywhere by not setting X-Frame-Options or CSP
-    // Do NOT copy any of origin response headers that could restrict embedding
-
     return res.send($.html());
   } catch (err) {
-    console.error('proxy.html error:', err && (err.message || err));
-    return res.status(500).send(`Error fetching ${target}: ${(err && err.message) || err}`);
+    // more verbose error logging for diagnosis
+    console.error('proxy.html error (catch):', err && (err.message || err));
+    if (err && err.stack) console.error(err.stack);
+    return res.status(500).send(`Internal proxy error: ${err && (err.message || String(err))}`);
   }
 }
 
-// /r handler: fetch resource (follow redirects manually) and return with safe headers
 async function resource(req, res) {
   const target = req.query.url;
   if (!target) return res.status(400).send('url required');
 
   try {
-    const { resp, finalUrl } = await fetchFollow(target, { responseType: 'arraybuffer', timeout: 30000 });
+    const { resp, finalUrl, error, chain } = await fetchFollowWithChain(target, { responseType: 'arraybuffer', timeout: 30000 });
+    if (error) {
+      console.error('fetchFollow (resource) error:', (error && (error.message || error)).toString());
+      console.error('resource fetch chain:', chain);
+      return res.status(502).send(`Upstream resource fetch error: ${error && (error.message || String(error))}`);
+    }
 
-    if (!resp) return res.status(500).send('No response from upstream');
-
-    // determine content-type
     const rawContentType = (resp.headers['content-type'] || '').split(';')[0] || '';
     const contentType = rawContentType || 'application/octet-stream';
 
-    // If CSS text, decode, rewrite @import/url and return as text
+    // prevent browser caching of redirect results
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+
     if (contentType === 'text/css' || /\.css(\?|$)/i.test(finalUrl)) {
       let css = resp.data.toString('utf8');
       css = css.replace(/@import\s+(?:url\()?['"]?(.*?)['"]?\)?\s*;/gi, (m, u) => {
@@ -216,39 +169,48 @@ async function resource(req, res) {
           return `url(${q}/r?url=${encodeURIComponent(abs)}${q})`;
         } catch { return m; }
       });
-
       res.set('Content-Type', 'text/css; charset=utf-8');
-      // Avoid passing origin CSP/XFO headers
-      res.set('Cache-Control', 'public, max-age=60');
       return res.send(css);
     }
 
-    // For JS text (some servers serve js as application/javascript)
     if (/javascript/.test(contentType) || /\.js(\?|$)/i.test(finalUrl)) {
       let jsText = resp.data.toString('utf8');
-
-      // attempt to rewrite absolute URLs in js code for fetch/import/open patterns
       jsText = jsText.replace(/fetch\(\s*(['"`])(https?:\/\/[^'"]+)\1/g, (m, q, u) => `fetch(${q}/r?url=${encodeURIComponent(u)}${q}`);
       jsText = jsText.replace(/import\(\s*(['"`])(https?:\/\/[^'"]+)\1\s*\)/g, (m, q, u) => `import(${q}/r?url=${encodeURIComponent(u)}${q})`);
       jsText = jsText.replace(/open\(\s*(['"`]?(GET|POST|PUT|DELETE)['"`]?)\s*,\s*(['"`])(https?:\/\/[^'"]+)\3/gi, (m, method, m2, q, u) => `open(${method}, ${q}/r?url=${encodeURIComponent(u)}${q}`);
-
       res.set('Content-Type', 'application/javascript; charset=utf-8');
-      res.set('Cache-Control', 'public, max-age=60');
       return res.send(jsText);
     }
 
-    // Binary: images, fonts, etc. Return raw buffer with safe headers
     const buf = Buffer.from(resp.data);
-
     res.set('Content-Type', contentType);
     res.set('Content-Length', buf.length);
-    // short caching to reduce repeated fetches but avoid stale redirect issues
-    res.set('Cache-Control', 'public, max-age=60');
     return res.send(buf);
   } catch (err) {
-    console.error('resource error', err && (err.message || err));
-    return res.status(500).send('resource fetch error: ' + ((err && err.message) || err));
+    console.error('resource error (catch):', err && (err.message || err));
+    if (err && err.stack) console.error(err.stack);
+    return res.status(500).send('resource fetch error: ' + ((err && (err.message || err)) || 'unknown'));
   }
 }
 
-module.exports = { html, resource };
+// debug endpoint
+async function debug(req, res) {
+  const target = req.query.url;
+  if (!target) return res.status(400).json({ error: 'url required' });
+  try {
+    const { resp, finalUrl, error, chain } = await fetchFollowWithChain(target, { responseType: 'arraybuffer', timeout: 20000 });
+    if (error) return res.status(200).json({ ok: false, error: String(error), chain });
+    return res.status(200).json({
+      ok: true,
+      finalUrl,
+      status: resp.status,
+      headers: resp.headers,
+      chain
+    });
+  } catch (e) {
+    console.error('debug error', e && (e.stack || e));
+    return res.status(500).json({ ok: false, error: String(e) });
+  }
+}
+
+module.exports = { html, resource, debug };
