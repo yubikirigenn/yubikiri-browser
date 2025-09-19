@@ -1,25 +1,16 @@
 // proxy.js
 const express = require("express");
 const axios = require("axios");
-require("axios-cookiejar-support").default(axios); // axios を拡張
+require("axios-cookiejar-support").default && require("axios-cookiejar-support").default(axios);
 const { CookieJar } = require("tough-cookie");
 const cheerio = require("cheerio");
 
 const router = express.Router();
 
-// hop-by-hop ヘッダ等を除外してコピーする補助
 function copyResponseHeaders(srcHeaders, res) {
   const forbidden = new Set([
-    "transfer-encoding",
-    "content-encoding",
-    "content-length",
-    "connection",
-    "keep-alive",
-    "proxy-authenticate",
-    "proxy-authorization",
-    "te",
-    "trailer",
-    "upgrade"
+    "transfer-encoding","content-encoding","content-length","connection",
+    "keep-alive","proxy-authenticate","proxy-authorization","te","trailer","upgrade"
   ]);
   Object.entries(srcHeaders || {}).forEach(([k, v]) => {
     if (!forbidden.has(k.toLowerCase())) {
@@ -28,7 +19,6 @@ function copyResponseHeaders(srcHeaders, res) {
   });
 }
 
-// URL を絶対化して proxy 経由 URL に変換
 function toProxyUrl(src, base) {
   if (!src) return src;
   const t = src.trim();
@@ -41,20 +31,15 @@ function toProxyUrl(src, base) {
   }
 }
 
-// srcset の書き換え (img の srcset 等)
 function rewriteSrcset(value, base) {
   if (!value) return value;
-  return value
-    .split(",")
-    .map(part => {
-      const [urlPart, descriptor] = part.trim().split(/\s+/, 2);
-      const rewritten = toProxyUrl(urlPart, base);
-      return descriptor ? `${rewritten} ${descriptor}` : rewritten;
-    })
-    .join(", ");
+  return value.split(",").map(part => {
+    const [urlPart, descriptor] = part.trim().split(/\s+/, 2);
+    const rewritten = toProxyUrl(urlPart, base);
+    return descriptor ? `${rewritten} ${descriptor}` : rewritten;
+  }).join(", ");
 }
 
-// CSS 内の url(...) を書き換える
 function rewriteCssUrls(cssText, base) {
   if (!cssText) return cssText;
   return cssText.replace(/url\(([^)]+)\)/g, (match, urlStr) => {
@@ -64,165 +49,112 @@ function rewriteCssUrls(cssText, base) {
   });
 }
 
-// 主処理：全メソッド受け付け
+// 全メソッド対応（GET/POST 等）
 router.all("/", async (req, res) => {
-  const raw = req.query.url;
+  let raw = req.query.url;
   if (!raw) return res.status(400).send("Missing url parameter");
 
-  // decode
-  let targetUrl;
   try {
-    targetUrl = decodeURIComponent(raw);
-  } catch {
-    targetUrl = raw;
-  }
+    try { raw = decodeURIComponent(raw); } catch (e) {}
 
-  try {
     const jar = new CookieJar();
-
-    // コピーするヘッダ（最小限） — 元ヘッダを丸ごと渡すと問題になるサイトがあるため調整
     const outHeaders = Object.assign({}, req.headers);
-    delete outHeaders.host; // host は外す
-    // 強制的に User-Agent を付与（必要なら調整）
-    outHeaders["user-agent"] =
-      outHeaders["user-agent"] ||
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    // Set Referer to origin of target if not present
+    delete outHeaders.host;
+    outHeaders["user-agent"] = outHeaders["user-agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
     if (!outHeaders.referer) {
-      try {
-        const u = new URL(targetUrl);
-        outHeaders.referer = u.origin + "/";
-      } catch (e) {}
+      try { outHeaders.referer = new URL(raw).origin + "/"; } catch {}
     }
 
-    // axios リクエスト設定
     const axiosConfig = {
-      url: targetUrl,
+      url: raw,
       method: req.method,
       headers: outHeaders,
       responseType: "arraybuffer",
       jar,
       withCredentials: true,
       maxRedirects: 6,
-      validateStatus: status => status < 500 // 4xx でも内容を受け取る
+      validateStatus: status => status < 500
     };
 
-    // POST/PUT/PATCH 等は body を stream として渡す（express の bodyParser を使っていない想定）
     if (req.method !== "GET" && req.method !== "HEAD") {
-      // req is a readable stream; axios can accept a stream as data
       axiosConfig.data = req;
     }
 
     const upstream = await axios.request(axiosConfig);
-
     const contentType = (upstream.headers["content-type"] || "").toLowerCase();
 
-    // HTML のときは書き換えを行う
     if (contentType.includes("text/html")) {
-      // バッファを文字列に変換（多くは UTF-8 だが charset があれば使う）
       let charset = "utf-8";
-      const ct = upstream.headers["content-type"] || "";
-      const m = ct.match(/charset=([^;,\s]+)/i);
+      const m = (upstream.headers["content-type"] || "").match(/charset=([^;,\s]+)/i);
       if (m) charset = m[1].toLowerCase();
-
       let html;
-      try {
-        html = upstream.data.toString(charset);
-      } catch (e) {
-        // フォールバック
-        html = upstream.data.toString("utf-8");
-      }
+      try { html = upstream.data.toString(charset); } catch { html = upstream.data.toString("utf-8"); }
 
       const $ = cheerio.load(html, { decodeEntities: false });
 
-      // head に base を追加（既にあれば上書きしない）
       if ($("head base").length === 0) {
-        $("head").prepend(`<base href="${targetUrl}">`);
+        $("head").prepend(`<base href="${raw}">`);
       }
 
-      // img の src, srcset
       $("img").each((_, el) => {
         const $el = $(el);
         const src = $el.attr("src");
-        if (src && !src.startsWith("data:")) $el.attr("src", toProxyUrl(src, targetUrl));
+        if (src && !src.startsWith("data:")) $el.attr("src", toProxyUrl(src, raw));
 
         const srcset = $el.attr("srcset");
-        if (srcset) $el.attr("srcset", rewriteSrcset(srcset, targetUrl));
+        if (srcset) $el.attr("srcset", rewriteSrcset(srcset, raw));
       });
 
-      // picture > source の srcset
       $("source").each((_, el) => {
         const $el = $(el);
         const srcset = $el.attr("srcset");
-        if (srcset) $el.attr("srcset", rewriteSrcset(srcset, targetUrl));
-
-        const src = $el.attr("src");
-        if (src && !src.startsWith("data:")) $el.attr("src", toProxyUrl(src, targetUrl));
+        if (srcset) $el.attr("srcset", rewriteSrcset(srcset, raw));
+        const s = $el.attr("src");
+        if (s && !s.startsWith("data:")) $el.attr("src", toProxyUrl(s, raw));
       });
 
-      // link (CSS 等)
       $("link").each((_, el) => {
         const $el = $(el);
         const href = $el.attr("href");
-        if (!href) return;
-        // 相対リンクも含めて絶対化してプロキシ化
-        $el.attr("href", toProxyUrl(href, targetUrl));
+        if (href) $el.attr("href", toProxyUrl(href, raw));
       });
 
-      // script src
       $("script").each((_, el) => {
         const $el = $(el);
         const src = $el.attr("src");
-        if (src) $el.attr("src", toProxyUrl(src, targetUrl));
+        if (src) $el.attr("src", toProxyUrl(src, raw));
       });
 
-      // iframe src
       $("iframe").each((_, el) => {
         const $el = $(el);
         const src = $el.attr("src");
-        if (src) $el.attr("src", toProxyUrl(src, targetUrl));
+        if (src) $el.attr("src", toProxyUrl(src, raw));
       });
 
-      // style タグ内の url(...)
       $("style").each((_, el) => {
         const $el = $(el);
         const css = $el.html();
-        if (css && css.includes("url(")) {
-          $el.html(rewriteCssUrls(css, targetUrl));
-        }
+        if (css && css.includes("url(")) $el.html(rewriteCssUrls(css, raw));
       });
 
-      // inline style 属性の書き換え
       $("[style]").each((_, el) => {
         const $el = $(el);
         const s = $el.attr("style");
-        if (s && s.includes("url(")) {
-          $el.attr("style", rewriteCssUrls(s, targetUrl));
-        }
+        if (s && s.includes("url(")) $el.attr("style", rewriteCssUrls(s, raw));
       });
 
-      // HTML 内の inline の src/href を持つ任意の要素も対象 (a[href] はあまり書き換えない方が良いが必要なら)
-      // ここは必要に応じて追加可能
-
       const outHtml = $.html();
-
       res.status(upstream.status || 200);
       res.set("Content-Type", upstream.headers["content-type"] || "text/html; charset=utf-8");
-      // 他の安全なヘッダだけコピー
       copyResponseHeaders(upstream.headers, res);
       res.send(outHtml);
       return;
     }
 
-    // CSS のときは中身を書き換えて返す（相対 URL をプロキシ経由に）
     if (contentType.includes("text/css")) {
       let css;
-      try {
-        css = upstream.data.toString("utf-8");
-      } catch {
-        css = upstream.data.toString();
-      }
-      const newCss = rewriteCssUrls(css, targetUrl);
+      try { css = upstream.data.toString("utf-8"); } catch { css = upstream.data.toString(); }
+      const newCss = rewriteCssUrls(css, raw);
       res.status(upstream.status || 200);
       res.set("Content-Type", upstream.headers["content-type"] || "text/css; charset=utf-8");
       copyResponseHeaders(upstream.headers, res);
@@ -230,17 +162,13 @@ router.all("/", async (req, res) => {
       return;
     }
 
-    // それ以外（画像・フォント・JS 等のバイナリ）はそのまま返す
+    // バイナリ等はそのまま
     res.status(upstream.status || 200);
-    // コピー可能なヘッダを設定
     copyResponseHeaders(upstream.headers, res);
-    // content-type は上書きしておく
     if (upstream.headers["content-type"]) res.set("Content-Type", upstream.headers["content-type"]);
-    // バイナリ送信
     res.send(Buffer.from(upstream.data));
   } catch (err) {
     console.error("Proxy error:", err && err.message ? err.message : err);
-    // もし axios のレスポンスがある場合は中身を返す（403/404 等）
     if (err.response && err.response.data) {
       try {
         const ct = err.response.headers && err.response.headers["content-type"];
@@ -252,11 +180,8 @@ router.all("/", async (req, res) => {
           copyResponseHeaders(err.response.headers, res);
           return res.send(Buffer.from(err.response.data));
         }
-      } catch (e) {
-        // fallthrough
-      }
+      } catch (e) {}
     }
-
     res.status(500).send("Proxy error: " + (err && err.message ? err.message : "unknown"));
   }
 });
