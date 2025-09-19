@@ -88,3 +88,22 @@ router.get("/", async (req, res) => {
 });
 
 module.exports = router;
+const input = document.querySelector("#top-large input");
+const button = document.querySelector("#top-large button");
+
+button.addEventListener("click", () => {
+  let value = input.value.trim();
+  let url;
+
+  try {
+    // URL としてパースできるか確認
+    url = new URL(value);
+  } catch {
+    // URL でない場合は Google 検索に変換
+    const query = encodeURIComponent(value);
+    url = new URL(`https://www.google.com/search?q=${query}`);
+  }
+
+  // proxy 経由で開く
+  window.location.href = `/proxy?url=${encodeURIComponent(url)}`;
+});
