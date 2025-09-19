@@ -2,20 +2,15 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Proxy Browser</title>
+  <title>Proxy Demo</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/script.js" defer></script>
 </head>
 <body>
-  <h1>Proxy Browser</h1>
-
-  <form id="urlForm">
-    <input type="text" id="urlInput" placeholder="https://example.com/" required style="width: 400px;">
-    <button type="submit">アクセス</button>
-  </form>
-
-  <div id="content">
-    <p>ここにページが表示されます...</p>
+  <div>
+    <input type="text" id="urlInput" placeholder="アクセスしたいURLを入力">
+    <button id="loadBtn">表示</button>
   </div>
+  <div id="content" style="margin-top:20px; border:1px solid #ccc; padding:10px;">ここにサイト内容が表示されます</div>
 </body>
 </html>
