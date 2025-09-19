@@ -140,3 +140,34 @@ document.addEventListener('DOMContentLoaded', () => {
   wireSearchBoxes();
   wireTopBarAutoShow();
 });
+async function loadSite(url) {
+  const content = document.getElementById('content');
+  const topLarge = document.getElementById('top-large'); // ←追加
+
+  if (!content) return;
+  proxiedActive = false; 
+  setTopSmallVisible(false);
+
+  // ...（中略：URL判定・fetch部分はそのまま）
+
+  try {
+    const res = await fetch(`/proxy?url=${encodeURIComponent(target)}`);
+    if (!res.ok) throw new Error('HTTP error! status: ' + res.status);
+    const html = await res.text();
+
+    content.innerHTML = html;
+    proxiedActive = true;
+
+    // ✅ 成功したらトップページを隠す
+    if (topLarge) {
+      topLarge.style.display = 'none';
+    }
+  } catch (err) {
+    console.error('Client fetch error:', err);
+    content.innerHTML = `<div style="padding:24px;color:#900">
+      読み込みに失敗しました：${String(err).replace(/</g,'&lt;')}
+    </div>`;
+    proxiedActive = false;
+    setTopSmallVisible(false);
+  }
+}
