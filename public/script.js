@@ -1,51 +1,43 @@
-// script.js
+document.addEventListener("DOMContentLoaded", () => {
+  const topLargeInput = document.querySelector("#top-large input");
+  const topLargeButton = document.querySelector("#top-large button");
+  const topSmallInput = document.querySelector("#top-small input");
+  const topSmallButton = document.querySelector("#top-small button");
 
-// 入力とボタンの取得
-const topLargeInput = document.querySelector("#top-large input");
-const topLargeButton = document.querySelector("#top-large button");
-
-const topSmallInput = document.querySelector("#top-small input");
-const topSmallButton = document.querySelector("#top-small button");
-
-// 入力値を判定して proxy に飛ばす関数
-function goToProxy(inputValue) {
-  inputValue = inputValue.trim();
-  let url;
-  try {
-    url = new URL(inputValue); // URLとして正しい場合はそのまま
-  } catch {
-    // URLでない場合は Google 検索に変換
-    url = new URL("https://www.google.com/search?q=" + encodeURIComponent(inputValue));
+  // URLかどうか判定する関数
+  function isValidUrl(text) {
+    try {
+      new URL(text);
+      return true;
+    } catch {
+      return false;
+    }
   }
-  window.location.href = "/proxy?url=" + encodeURIComponent(url);
-}
 
-// 大きなバーのボタンイベント
-topLargeButton.addEventListener("click", () => {
-  goToProxy(topLargeInput.value);
-});
+  // 入力を処理する共通関数
+  function handleInput(value) {
+    if (!value) return;
 
-// Enter キーでの送信
-topLargeInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") goToProxy(topLargeInput.value);
-});
+    let target;
+    if (isValidUrl(value)) {
+      target = `/proxy?url=${encodeURIComponent(value)}`;
+    } else {
+      target = `/proxy?url=${encodeURIComponent("https://www.google.com/search?q=" + value)}`;
+    }
 
-// 小さなバーのボタンイベント
-topSmallButton.addEventListener("click", () => {
-  goToProxy(topSmallInput.value);
-});
-
-// Enter キーでの送信
-topSmallInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") goToProxy(topSmallInput.value);
-});
-
-// スクロールで小バー表示
-const topSmall = document.getElementById("top-small");
-window.addEventListener("scroll", () => {
-  if (window.scrollY > 150) {
-    topSmall.style.top = "0";
-  } else {
-    topSmall.style.top = "-60px";
+    window.location.href = target;
   }
+
+  // Enter キーで送信
+  [topLargeInput, topSmallInput].forEach((input) => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        handleInput(input.value);
+      }
+    });
+  });
+
+  // ボタンで送信
+  topLargeButton.addEventListener("click", () => handleInput(topLargeInput.value));
+  topSmallButton.addEventListener("click", () => handleInput(topSmallInput.value));
 });
