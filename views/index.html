@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>yubikiri-proxy</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>yubikiri-proxy</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <div id="top-large">
+    <h1>yubikiri-proxy</h1>
+    <div class="search-row">
+      <input type="text" placeholder="URL または検索語を入力" />
+      <button id="top-large-go">GO</button>
+    </div>
+  </div>
 
-<!-- 大きいトップページ用検索 -->
-<div id="top-large">
-  <h1>yubikiri-proxy</h1>
-  <input type="text" placeholder="URL または検索語を入力">
-  <button>GO</button>
-</div>
+  <div id="top-small">
+    <div class="search-row">
+      <input type="text" placeholder="URL または検索語を入力" />
+      <button id="top-small-go">GO</button>
+    </div>
+  </div>
 
-<!-- 上部固定小さいバー（スクロール時表示） -->
-<div id="top-small">
-  <input type="text" placeholder="URL または検索語を入力">
-  <button>GO</button>
-</div>
+  <div id="content">Loading...</div>
 
-<!-- プロキシで読み込んだコンテンツ表示用 -->
-<div id="content"></div>
-
-<script src="script.js"></script>
+  <script src="/script.js" defer></script>
 </body>
 </html>
