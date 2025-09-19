@@ -2,234 +2,189 @@
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
+const { URL } = require("url");
 const router = express.Router();
 
-/**
- * ブラウザっぽいヘッダを作る
- */
-function makeHeaders(targetUrl, userAgent) {
-  const origin = (() => {
-    try { return new URL(targetUrl).origin; } catch(e) { return undefined; }
-  })();
-
-  return {
-    "User-Agent": userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Referer": origin || "",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-    // sec-fetch は場合によっては有効（最初は送る）
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-User": "?1",
-    "Sec-Fetch-Dest": "document"
-  };
+function buildProxyBase(req) {
+  // req.protocol may be 'http' or 'https' depending on hosting
+  // req.get('host') は host:port を返します
+  return `${req.protocol}://${req.get("host")}`;
 }
 
-/**
- * CSS 内の url(...) と @import をプロキシパスに書き換える
- */
-function rewriteCssUrls(cssText, baseUrl) {
-  // url(...) を全て検出して /proxy?url=... に置換
-  const replaced = cssText.replace(/url\(\s*(['"]?)(.*?)\1\s*\)/g, (m, quote, url) => {
-    // data: スキップ
-    if (/^\s*data:/i.test(url)) return `url(${quote}${url}${quote})`;
-    try {
-      const resolved = new URL(url, baseUrl).toString();
-      return `url(${quote}/proxy?url=${encodeURIComponent(resolved)}${quote})`;
-    } catch(e) {
-      return m;
-    }
-  }).replace(/@import\s+(['"])([^'"]+)\1/g, (m, q, url) => {
-    try {
-      const resolved = new URL(url, baseUrl).toString();
-      return `@import "${'/proxy?url=' + encodeURIComponent(resolved)}"`;
-    } catch(e) {
-      return m;
-    }
-  });
-  return replaced;
+function absUrl(urlLike, base) {
+  try {
+    return new URL(urlLike, base).toString();
+  } catch (e) {
+    return null;
+  }
 }
 
-/**
- * HTML 内のリンク等を書き換え（img, script, link, a, source, iframe の src/href/srcset 等）
- */
-function rewriteHtml($, baseUrl) {
-  // img
-  $("img").each((_, el) => {
-    const $el = $(el);
-    const src = $el.attr("src");
-    if (src && !src.startsWith("data:")) {
-      try { $el.attr("src", `/proxy?url=${encodeURIComponent(new URL(src, baseUrl).toString())}`); } catch(e){}
-    }
-    // srcset
-    const srcset = $el.attr("srcset");
-    if (srcset) {
-      const newSrcset = srcset.split(",").map(part => {
-        const [urlPart, size] = part.trim().split(/\s+/);
-        try {
-          const resolved = new URL(urlPart, baseUrl).toString();
-          return `/proxy?url=${encodeURIComponent(resolved)}${size ? ' ' + size : ''}`;
-        } catch(e) {
-          return part;
-        }
-      }).join(", ");
-      $el.attr("srcset", newSrcset);
-    }
-  });
-
-  // link (css, preloads)
-  $("link").each((_, el) => {
-    const $el = $(el);
-    const href = $el.attr("href");
-    if (href) {
-      try { $el.attr("href", `/proxy?url=${encodeURIComponent(new URL(href, baseUrl).toString())}`); } catch(e){}
-    }
-  });
-
-  // script
-  $("script").each((_, el) => {
-    const $el = $(el);
-    const src = $el.attr("src");
-    if (src) {
-      try { $el.attr("src", `/proxy?url=${encodeURIComponent(new URL(src, baseUrl).toString())}`); } catch(e){}
-    } else {
-      // インラインスクリプトはそのまま
-    }
-  });
-
-  // a タグ（リンク先） - 必要ならプロキシを通す（外部へ飛ばしたい場合はコメントアウト）
-  $("a").each((_, el) => {
-    const $el = $(el);
-    const href = $el.attr("href");
-    if (href && !href.startsWith("#") && !href.startsWith("mailto:") && !href.startsWith("javascript:")) {
-      try { $el.attr("href", `/proxy?url=${encodeURIComponent(new URL(href, baseUrl).toString())}`); } catch(e){}
-    }
-  });
-
-  // source, video, audio, iframe
-  $("source, video, audio, iframe").each((_, el) => {
-    const $el = $(el);
-    const src = $el.attr("src");
-    if (src && !src.startsWith("data:")) {
-      try { $el.attr("src", `/proxy?url=${encodeURIComponent(new URL(src, baseUrl).toString())}`); } catch(e){}
-    }
-  });
-
-  // style attribute 内の url(...)
-  $("[style]").each((_, el) => {
-    const $el = $(el);
-    const style = $el.attr("style");
-    if (style && style.includes("url(")) {
-      $el.attr("style", rewriteCssUrls(style, baseUrl));
-    }
+function rewriteCssUrls(cssText, targetBase, proxyBase) {
+  // cssText: string, targetBase: original page url, proxyBase: our proxy origin
+  return cssText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (m, q, u) => {
+    const a = absUrl(u, targetBase);
+    if (!a) return m;
+    return `url("${proxyBase}/proxy?url=${encodeURIComponent(a)}")`;
   });
 }
 
-/**
- * メインルート
- */
 router.get("/", async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send("Missing url parameter");
 
-  // targetUrl がエンコード済みで来る可能性を考慮
-  const decoded = decodeURIComponent(targetUrl);
+  console.log("=== Proxy Request Start ===");
+  console.log("Target URL:", targetUrl);
 
-  // axios instance（バイナリ対応、リダイレクト許可）
-  const ax = axios.create({
-    responseType: "arraybuffer",
-    maxRedirects: 10,
-    validateStatus: null,
-    timeout: 15000
-  });
-
-  // try fetch with primary headers, on 403 try alternate
-  async function fetchOnce(url, attempt = 1) {
-    const uaPrimary = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    const uaAlt = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15";
-    const headers = makeHeaders(url, attempt === 1 ? uaPrimary : uaAlt);
-
-    try {
-      console.log("=== Proxy Request Start ===");
-      console.log("Target URL:", url);
-      const response = await ax.get(url, { headers });
-      console.log("Response status:", response.status);
-      // expose some response headers for debugging
-      // console.log("Resp headers:", response.headers);
-      return response;
-    } catch (e) {
-      console.error("fetchOnce error:", e && e.message ? e.message : e);
-      throw e;
-    }
-  }
+  // ヘッダー偽装（ブラウザっぽく）
+  const defaultHeaders = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
+    Referer: targetUrl,
+    "Upgrade-Insecure-Requests": "1"
+  };
 
   try {
-    // 1回目
-    let response = await fetchOnce(decoded, 1);
+    // GET で arraybuffer（バイナリも扱えるように）
+    const response = await axios.get(targetUrl, {
+      responseType: "arraybuffer",
+      maxRedirects: 5,
+      timeout: 20000,
+      headers: defaultHeaders,
+      validateStatus: (s) => true // ステータスは自前で判定
+    });
 
-    // 403 の場合は 1 回だけ UA を変えてリトライ
-    if (response.status === 403) {
-      console.warn("Got 403, trying alt UA...");
-      response = await fetchOnce(decoded, 2);
+    console.log("Target URL:", targetUrl, "=>", "status", response.status);
+
+    if (response.status >= 400) {
+      // 403 等はここで分かる。詳細ログを残す。
+      console.warn("Target responded with status", response.status);
+      return res
+        .status(500)
+        .send(`Proxy error: target responded ${response.status}`);
     }
 
-    const contentType = (response.headers && response.headers["content-type"]) ? response.headers["content-type"] : "";
+    const contentType = (response.headers["content-type"] || "").toLowerCase();
+    const proxyBase = buildProxyBase(req);
 
-    // デバッグ出力（Render のログに出る）
-    console.log("Proxy: Target URL:", decoded, "Status:", response.status, "Content-Type:", contentType);
-
-    // HTML の場合（text/html）
+    // HTML の場合：cheerio で書き換え
     if (contentType.includes("text/html")) {
-      const html = response.data.toString("utf-8");
+      // 文字コードは多くが utf-8 だが、別のサイトでは文字化けすることがあります。
+      const html = response.data.toString("utf8");
       const $ = cheerio.load(html, { decodeEntities: false });
 
-      // 書き換えを実行
-      rewriteHtml($, decoded);
+      // remove CSP meta tags to avoid blocking
+      $('meta[http-equiv="Content-Security-Policy"]').remove();
+      $('meta[name="Content-Security-Policy"]').remove();
 
-      // CSS を inline/style 要素内でも書き換える（style タグ）
-      $("style").each((_, el) => {
-        const $el = $(el);
-        const txt = $el.html();
-        if (txt && txt.includes("url(")) {
-          $el.html(rewriteCssUrls(txt, decoded));
+      // rewrite <base>（存在する場合は削除しておく — 相対解決をサーバ側で行う）
+      $('base').remove();
+
+      // 全ての要素について src / href 書き換え
+      const ATTRS = ["src", "href", "action", "data-src", "data-href"];
+      $("*").each((_, el) => {
+        ATTRS.forEach((attr) => {
+          const v = $(el).attr(attr);
+          if (!v) return;
+          // data: や javascript: はそのまま
+          if (/^\s*(data:|javascript:|mailto:|#)/i.test(v)) return;
+          const absolute = absUrl(v, targetUrl);
+          if (!absolute) return;
+          $(el).attr(attr, `${proxyBase}/proxy?url=${encodeURIComponent(absolute)}`);
+        });
+
+        // srcset の処理（画像のレスポンシブ）
+        const srcset = $(el).attr("srcset");
+        if (srcset) {
+          const parts = srcset.split(",");
+          const rewritten = parts
+            .map((p) => {
+              const [u, descriptor] = p.trim().split(/\s+/, 2);
+              if (!u) return "";
+              if (/^\s*(data:|javascript:|#)/i.test(u)) return p.trim();
+              const absolute = absUrl(u, targetUrl);
+              if (!absolute) return "";
+              return `${proxyBase}/proxy?url=${encodeURIComponent(absolute)}${descriptor ? " " + descriptor : ""}`;
+            })
+            .filter(Boolean)
+            .join(", ");
+          $(el).attr("srcset", rewritten);
+        }
+
+        // style 属性内の url(...) を書き換え
+        const style = $(el).attr("style");
+        if (style && style.includes("url(")) {
+          $(el).attr("style", rewriteCssUrls(style, targetUrl, proxyBase));
         }
       });
 
-      // <link rel="stylesheet"> の場合、ブラウザが /proxy?url=... を呼ぶので
-      // そちらのレスポンス側で CSS 内書き換えをする（下の else branch が担当）
+      // <link rel="stylesheet"> は href を書き換える（上のループで処理されているはず）
+      // <script src> は上のループで処理（ただし inline script はそのまま）
+
+      // <style> タグの中身も書き換え
+      $("style").each((_, el) => {
+        const txt = $(el).html();
+        if (txt && txt.includes("url(")) {
+          $(el).html(rewriteCssUrls(txt, targetUrl, proxyBase));
+        }
+      });
+
+      // meta refresh の書き換え (例: content="5;url=/path")
+      $('meta[http-equiv="refresh"]').each((_, el) => {
+        const content = $(el).attr("content");
+        if (!content) return;
+        const m = content.match(/^\s*([\d]+)\s*;\s*url=(.*)/i);
+        if (m) {
+          const urlPart = m[2].replace(/^["']|["']$/g, "");
+          const absolute = absUrl(urlPart, targetUrl);
+          if (absolute) {
+            $(el).attr("content", `${m[1]};url=${proxyBase}/proxy?url=${encodeURIComponent(absolute)}`);
+          }
+        }
+      });
+
+      // 返却する際のヘッダ調整（CSP等でブロックされないよう緩める）
       res.set("Content-Type", "text/html; charset=utf-8");
-      res.send($.html());
-      return;
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("X-Frame-Options", "ALLOWALL");
+      // 送るHTMLを取得して返す
+      const out = $.html();
+      console.log("Rewriting complete, sending HTML length:", out.length);
+      return res.send(out);
     }
 
-    // CSS の場合（text/css or css）
-    if (contentType.includes("css")) {
-      const cssText = response.data.toString("utf-8");
-      const rewritten = rewriteCssUrls(cssText, decoded);
-      res.set("Content-Type", contentType);
-      res.send(rewritten);
-      return;
+    // CSS の場合（content-type に text/css が含まれる）: url(...) を書き換えて返す
+    if (contentType.includes("text/css") || contentType.includes("text/x-css")) {
+      const cssText = response.data.toString("utf8");
+      const rewritten = rewriteCssUrls(cssText, targetUrl, proxyBase);
+      res.set("Content-Type", "text/css; charset=utf-8");
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("X-Frame-Options", "ALLOWALL");
+      return res.send(rewritten);
     }
 
-    // 画像 / バイナリなどはそのまま返す（arraybuffer）
-    // 一部サイトは CORS ヘッダを必要とするが、proxy を通す場合は origin が同じなので問題は少ない
-    res.set("Content-Type", contentType || "application/octet-stream");
+    // それ以外（画像・フォント・JSなど）はバイナリのまま返す
+    // ただし、content-type をベタにセット（元のまま）
+    const ct = response.headers["content-type"] || "application/octet-stream";
+    res.set("Content-Type", ct);
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("X-Frame-Options", "ALLOWALL");
+    // 可能ならキャッシュ制御を元のまま渡す（ただし安全のため可変）
+    if (response.headers["cache-control"]) {
+      res.set("Cache-Control", response.headers["cache-control"]);
+    }
 
-    // Set some cache-control to reduce load (必要に応じて調整)
-    res.set("Cache-Control", "no-store");
-
-    res.send(response.data);
+    // バイナリ response.data は Buffer（arraybuffer）になっている
+    return res.send(Buffer.from(response.data));
   } catch (err) {
     console.error("Proxy error:", err && err.message ? err.message : err);
-    // 可能なら upstream のステータスを出す
-    if (err.response && err.response.status) {
-      console.error("Upstream status:", err.response.status);
-      res.status(500).send(`Proxy error: Upstream status ${err.response.status}`);
-    } else {
-      res.status(500).send("Proxy error: " + (err.message || String(err)));
+    // 詳細ログ（target のステータスが取得できる場合）
+    if (err.response) {
+      console.error("Target URL:", targetUrl, "status:", err.response.status);
     }
+    return res.status(500).send("Proxy error: " + (err.message || String(err)));
   }
 });
 
