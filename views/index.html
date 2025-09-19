@@ -1,16 +1,41 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Proxy Demo</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Yubikiri Proxy</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/script.js" defer></script>
 </head>
 <body>
-  <div>
-    <input type="text" id="urlInput" placeholder="アクセスしたいURLを入力">
-    <button id="loadBtn">表示</button>
+  <!-- Top large area (Google-like) -->
+  <header id="top-large">
+    <div class="brand">Yubikiri Proxy</div>
+    <form id="big-form" class="big-form" action="#" onsubmit="return false;">
+      <input id="big-input" type="text" placeholder="https://example.com/ を入力して Enter" autocomplete="off" />
+      <button id="big-go" type="button">開く</button>
+    </form>
+    <div class="hint">※ 任意の URL を入力してプロキシ経由で表示します</div>
+  </header>
+
+  <!-- Thin bar that appears when page open / when mouse near top -->
+  <div id="thin-bar" class="hidden">
+    <div class="thin-left">Yubikiri Proxy</div>
+    <form id="thin-form" action="#" onsubmit="return false;">
+      <input id="thin-input" type="text" placeholder="URL を入力して Enter" autocomplete="off" />
+      <button id="thin-go" type="button" aria-label="Open">⏎</button>
+    </form>
   </div>
-  <div id="content" style="margin-top:20px; border:1px solid #ccc; padding:10px;">ここにサイト内容が表示されます</div>
+
+  <!-- Content area where proxied HTML will be injected (full-screen) -->
+  <main id="content" tabindex="0">
+    <div class="start-note">
+      <p>Yubikiri Proxyへようこそ。上の検索ボックスにURLを入力して「開く」を押すか Enter を押してください。</p>
+      <p>表示中にマウスを上端に移動すると細いURLバーが表示されます。</p>
+    </div>
+  </main>
+
+  <!-- loading overlay -->
+  <div id="loading" class="hidden">読み込み中…</div>
 </body>
 </html>
