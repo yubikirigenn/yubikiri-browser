@@ -2,11 +2,20 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Proxy Demo</title>
+  <title>Proxy Browser</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/script.js" defer></script>
 </head>
 <body>
-  <div id="content">Loading...</div>
+  <h1>Proxy Browser</h1>
+
+  <form id="urlForm">
+    <input type="text" id="urlInput" placeholder="https://example.com/" required style="width: 400px;">
+    <button type="submit">アクセス</button>
+  </form>
+
+  <div id="content">
+    <p>ここにページが表示されます...</p>
+  </div>
 </body>
 </html>
