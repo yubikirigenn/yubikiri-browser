@@ -3,43 +3,13 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const router = express.Router();
 
-// -----------------------------
-// トップページとプロキシ処理
-// -----------------------------
 router.get("/", async (req, res) => {
   const targetUrl = req.query.url;
 
-  // -----------------------------
-  // トップページ表示
-  // -----------------------------
   if (!targetUrl) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Yubikiri Proxy</title>
-        <style>
-          body { margin: 0; font-family: sans-serif; text-align: center; margin-top: 100px; }
-          h1 { font-size: 64px; margin-bottom: 40px; }
-          input { width: 400px; padding: 12px; font-size: 18px; }
-          button { padding: 12px 20px; font-size: 18px; }
-        </style>
-      </head>
-      <body>
-        <h1>Yubikiri Proxy</h1>
-        <form method="get">
-          <input type="text" name="url" placeholder="Enter URL" />
-          <button type="submit">GO</button>
-        </form>
-      </body>
-      </html>
-    `);
+    return res.status(400).send("Missing url parameter");
   }
 
-  // -----------------------------
-  // プロキシ処理
-  // -----------------------------
   try {
     const response = await axios.get(targetUrl, {
       responseType: "arraybuffer",
@@ -52,6 +22,7 @@ router.get("/", async (req, res) => {
     const contentType = response.headers["content-type"] || "";
 
     if (contentType.includes("text/html")) {
+      // HTMLの場合、リンク書き換え
       const html = response.data.toString("utf-8");
       const $ = cheerio.load(html);
 
