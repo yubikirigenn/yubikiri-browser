@@ -1,23 +1,16 @@
-// proxy.js
+// proxy.js（差し替え用）
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
 const { URL } = require("url");
 const router = express.Router();
 
-// 簡易 cookie store: { hostname -> {name: value, ...} }
 const cookieStore = new Map();
-
-function buildProxyBase(req) {
-  return `${req.protocol}://${req.get("host")}`;
-}
-function absUrl(urlLike, base) {
-  try { return new URL(urlLike, base).toString(); } catch(e){ return null; }
-}
+function buildProxyBase(req) { return `${req.protocol}://${req.get("host")}`; }
+function absUrl(urlLike, base) { try { return new URL(urlLike, base).toString(); } catch(e){ return null; } }
 function rewriteCssUrls(cssText, targetBase, proxyBase) {
   return cssText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (m, q, u) => {
-    const a = absUrl(u, targetBase);
-    if (!a) return m;
+    const a = absUrl(u, targetBase); if (!a) return m;
     return `url("${proxyBase}/proxy?url=${encodeURIComponent(a)}")`;
   });
 }
@@ -41,7 +34,6 @@ function buildCookieHeaderForHost(host) {
   return Object.entries(map).map(([k,v])=>`${k}=${v}`).join("; ");
 }
 
-// 複数プリセット（User-Agent, Accept, Referer 等）を試す
 const HEADER_PRESETS = [
   { name: "chrome", headers: {
       "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -66,7 +58,6 @@ async function tryFetch(targetUrl, clientIp) {
     const preset = HEADER_PRESETS[i];
     const headers = Object.assign({}, preset.headers, {
       Referer: targetUrl,
-      // optional: X-Forwarded-For を入れてみる（効果は限定的）
       "X-Forwarded-For": clientIp || ""
     });
     const cookieHeader = host ? buildCookieHeaderForHost(host) : null;
@@ -87,35 +78,39 @@ async function tryFetch(targetUrl, clientIp) {
         parseSetCookieArray(resp.headers["set-cookie"], host);
       }
 
-      // if not 403, return
-      if (resp.status !== 403) {
-        console.log(`[proxy] got status ${resp.status} with preset=${preset.name}`);
-        return resp;
-      } else {
-        console.warn(`[proxy] 403 from target with preset=${preset.name}`);
-        // try next preset
+      // Log details every attempt (helpful to debug 403)
+      console.log(`[proxy] attempt=${i+1} status=${resp.status} preset=${preset.name} content-type=${resp.headers['content-type'] || ''}`);
+      if (resp.status === 403) {
+        // log snippet of response body to help diagnose challenge pages
+        let snippet = "";
+        try { snippet = resp.data && resp.data.length ? resp.data.toString("utf8").slice(0,1000) : ""; } catch(e){ snippet = "[snippet-read-failed]"; }
+        console.warn(`[proxy] 403 snippet(${snippet.length}):\n${snippet.replace(/</g,'&lt;')}`);
       }
+
+      if (resp.status !== 403) return resp;
+      // otherwise try next preset
     } catch (e) {
-      console.error("[proxy] fetch error", e && e.message ? e.message : e);
-      // try next preset
+      console.error("[proxy] fetch error (attempt)", e && e.message ? e.message : e);
+      // try next
     }
   }
 
-  // 最後に一回、ヘッダを更に変えて試す（Refererなしなど）
+  // final attempt (bare headers)
   try {
-    console.log("[proxy] final attempt with bare headers");
+    console.log("[proxy] final bare attempt");
     const resp = await axios.get(targetUrl, {
       responseType: "arraybuffer",
-      headers: {
-        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept":"*/*"
-      },
+      headers: { "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept":"*/*" },
       maxRedirects: 5,
       timeout: 20000,
       validateStatus: () => true
     });
-    if (host && resp.headers && resp.headers["set-cookie"]) {
-      parseSetCookieArray(resp.headers["set-cookie"], host);
+    if (host && resp.headers && resp.headers["set-cookie"]) parseSetCookieArray(resp.headers["set-cookie"], host);
+    console.log("[proxy] final status", resp.status);
+    if (resp.status === 403) {
+      let snippet = "";
+      try { snippet = resp.data && resp.data.length ? resp.data.toString("utf8").slice(0,1000) : ""; } catch(e){ snippet = "[snippet-read-failed]"; }
+      console.warn(`[proxy] final 403 snippet:\n${snippet.replace(/</g,'&lt;')}`);
     }
     return resp;
   } catch (e) {
@@ -124,12 +119,48 @@ async function tryFetch(targetUrl, clientIp) {
   }
 }
 
+/* ------------- OPTIONAL Playwright fallback ------------- */
+/* 使いたい場合は: npm i playwright
+   環境によっては追加設定が必要です（Renderで動かすなら要確認）。
+   有効化は後述のルート内で query.forcePlaywright をチェックして行ってください。
+*/
+async function fetchWithPlaywright(url) {
+  // lazy require so server still runs when playwright is not installed
+  const { chromium } = require('playwright'); // 例: chrome系
+  const browser = await chromium.launch({ args: ['--no-sandbox','--disable-setuid-sandbox'], headless: true });
+  try {
+    const page = await browser.newPage({ userAgent: HEADER_PRESETS[0].headers['User-Agent'] });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    const html = await page.content();
+    const cookies = await page.context().cookies();
+    // simplified cookies -> store into cookieStore if needed
+    try {
+      const host = new URL(url).hostname;
+      const map = cookieStore.get(host) || {};
+      cookies.forEach(c => { map[c.name] = c.value; });
+      cookieStore.set(host, map);
+    } catch(e){}
+    return { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, data: Buffer.from(html, 'utf8') };
+  } finally {
+    await browser.close();
+  }
+}
+/* ------------------------------------------------------- */
+
 router.get("/", async (req, res) => {
   const targetUrl = req.query.url;
   console.log("=== Proxy Request Start ===", req.ip, req.originalUrl);
   if (!targetUrl) return res.status(400).send("Missing url parameter");
 
   try {
+    // If caller requested playwright fallback explicitly:
+    if (req.query.forcePlaywright === "1") {
+      console.log("[proxy] using Playwright fallback for", targetUrl);
+      const resp = await fetchWithPlaywright(targetUrl);
+      res.set("Content-Type", resp.headers["content-type"] || "text/html");
+      return res.status(resp.status || 200).send(resp.data);
+    }
+
     const resp = await tryFetch(targetUrl, req.ip);
     console.log("Target URL:", targetUrl, "=> status", resp.status);
 
@@ -137,24 +168,24 @@ router.get("/", async (req, res) => {
     const proxyBase = buildProxyBase(req);
 
     if (resp.status >= 400) {
-      const snippet = resp.data && resp.data.length ? resp.data.toString("utf8").slice(0,200) : "";
+      const snippet = resp.data && resp.data.length ? resp.data.toString("utf8").slice(0,1000) : "";
       console.warn("Target returned status", resp.status);
-      res.status(resp.status).set("Content-Type","text/html; charset=utf-8").send(
-        `<pre style="white-space:pre-wrap;">Proxy: target returned ${resp.status}\n\nSnippet:\n${snippet.replace(/</g,'&lt;')}</pre>`
+      // NOTE: デバッグ用にヘッダとスニペットを返す（本番ではマスクする）
+      return res.status(resp.status).set("Content-Type","text/html; charset=utf-8").send(
+        `<h3>Proxy: target returned ${resp.status}</h3>
+         <h4>Response headers:</h4><pre>${JSON.stringify(resp.headers,null,2)}</pre>
+         <h4>Response snippet (first 1000 chars):</h4><pre>${snippet.replace(/</g,'&lt;')}</pre>`
       );
-      return;
     }
 
     if (contentType.includes("text/html")) {
       let html = resp.data.toString("utf8");
       const $ = cheerio.load(html, { decodeEntities: false });
 
-      // remove CSP / base tags
       $('meta[http-equiv="Content-Security-Policy"]').remove();
       $('meta[name="Content-Security-Policy"]').remove();
       $('base').remove();
 
-      // rewrite attributes
       const ATTRS = ["src","href","action","data-src","data-href"];
       $("*").each((_, el) => {
         ATTRS.forEach(attr => {
@@ -165,8 +196,6 @@ router.get("/", async (req, res) => {
           if (!absolute) return;
           $(el).attr(attr, `${proxyBase}/proxy?url=${encodeURIComponent(absolute)}`);
         });
-
-        // srcset
         const srcset = $(el).attr("srcset");
         if (srcset) {
           const parts = srcset.split(",");
@@ -180,23 +209,15 @@ router.get("/", async (req, res) => {
           }).filter(Boolean).join(", ");
           $(el).attr("srcset", rewritten);
         }
-
-        // inline style url()
         const style = $(el).attr("style");
-        if (style && style.includes("url(")) {
-          $(el).attr("style", rewriteCssUrls(style, targetUrl, proxyBase));
-        }
+        if (style && style.includes("url(")) $(el).attr("style", rewriteCssUrls(style, targetUrl, proxyBase));
       });
 
-      // style blocks
       $("style").each((_, el)=>{
         const txt = $(el).html();
-        if (txt && txt.includes("url(")) {
-          $(el).html(rewriteCssUrls(txt, targetUrl, proxyBase));
-        }
+        if (txt && txt.includes("url(")) $(el).html(rewriteCssUrls(txt, targetUrl, proxyBase));
       });
 
-      // meta refresh
       $('meta[http-equiv="refresh"]').each((_, el)=>{
         const content = $(el).attr("content");
         if (!content) return;
@@ -204,9 +225,7 @@ router.get("/", async (req, res) => {
         if (m) {
           const urlPart = m[2].replace(/^["']|["']$/g,"");
           const absolute = absUrl(urlPart, targetUrl);
-          if (absolute) {
-            $(el).attr("content", `${m[1]};url=${proxyBase}/proxy?url=${encodeURIComponent(absolute)}`);
-          }
+          if (absolute) $(el).attr("content", `${m[1]};url=${proxyBase}/proxy?url=${encodeURIComponent(absolute)}`);
         }
       });
 
@@ -225,7 +244,6 @@ router.get("/", async (req, res) => {
       return res.send(cssText);
     }
 
-    // その他はそのまま
     res.set("Content-Type", resp.headers["content-type"] || "application/octet-stream");
     res.set("Access-Control-Allow-Origin","*");
     res.set("X-Frame-Options","ALLOWALL");
