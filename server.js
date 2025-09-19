@@ -1,19 +1,28 @@
-const express = require("express");
-const path = require("path");
-const proxyRouter = require("./proxy");
+// server.js
+const express = require('express');
+const path = require('path');
+const proxyRouter = require('./proxy'); // ルートに置く proxy.js
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
-app.use(express.static(path.join(__dirname, "public")));
+// 静的ファイル（public フォルダ）
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "index.html"));
+// ルートページ
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
-// 汎用プロキシ
-app.use("/proxy", proxyRouter);
+// /proxy にプロキシルータを割り当て
+app.use('/proxy', proxyRouter);
+
+// エラーハンドラ（最低限）
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err && err.stack ? err.stack : err);
+  res.status(500).send('Server error');
+});
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`✅ yubikiri-proxy running at http://localhost:${PORT}`);
 });
