@@ -1,4 +1,3 @@
-// proxy.js
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
@@ -6,13 +5,12 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   const targetUrl = req.query.url;
-
   if (!targetUrl) {
     return res.status(400).send("Missing url parameter");
   }
 
   try {
-    // axiosで取得
+    // axios で外部ページを取得
     const response = await axios.get(targetUrl, {
       responseType: "arraybuffer",
       headers: {
@@ -21,13 +19,14 @@ router.get("/", async (req, res) => {
       }
     });
 
-    const contentType = response.headers["content-type"];
+    const contentType = response.headers["content-type"] || "";
 
-    // HTML の場合 → cheerioでリンク書き換え
+    // HTML の場合はリンク書き換え
     if (contentType.includes("text/html")) {
       const html = response.data.toString("utf-8");
       const $ = cheerio.load(html);
 
+      // 画像
       $("img").each((_, el) => {
         const src = $(el).attr("src");
         if (src && !src.startsWith("data:")) {
@@ -35,6 +34,7 @@ router.get("/", async (req, res) => {
         }
       });
 
+      // CSS
       $("link").each((_, el) => {
         const href = $(el).attr("href");
         if (href) {
@@ -42,6 +42,7 @@ router.get("/", async (req, res) => {
         }
       });
 
+      // JS
       $("script").each((_, el) => {
         const src = $(el).attr("src");
         if (src) {
@@ -52,7 +53,7 @@ router.get("/", async (req, res) => {
       res.set("Content-Type", "text/html");
       res.send($.html());
     } else {
-      // HTML 以外（CSS, JS, 画像など）はそのまま返す
+      // HTML 以外はそのまま返す
       res.set("Content-Type", contentType);
       res.send(response.data);
     }
