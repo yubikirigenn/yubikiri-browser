@@ -224,3 +224,14 @@ body {
   transition: top 0.3s ease;
   z-index: 1000;
 }
+/* ------------------------- */
+/* 検索バーのサイズ安定化 */
+/* ------------------------- */
+#top-small input,
+#top-small button {
+  box-sizing: border-box; /* paddingとborderを含めてサイズ固定 */
+  line-height: normal;     /* 高さが不安定になるのを防ぐ */
+  min-height: 36px;        /* 最小高さを指定 */
+  max-height: 36px;        /* 最大高さを固定 */
+  vertical-align: middle;  /* ボタンやテキストと縦位置を揃える */
+}
