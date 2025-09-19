@@ -106,3 +106,69 @@ body {
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
   transform: translateY(2px);
 }
+/* ------------------------- */
+/* 2010年代風立体ボタン・入力（ブラックテーマ） */
+/* ------------------------- */
+#top-large input,
+#top-small input {
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: rgba(20, 20, 20, 0.9);
+  color: #fff;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.5);
+  transition: all 0.2s ease;
+}
+
+#top-large input:focus,
+#top-small input:focus {
+  border-color: #888;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.7);
+  outline: none;
+}
+
+#top-large button,
+#top-small button {
+  border: 1px solid #888;
+  border-radius: 4px;
+  background: linear-gradient(to bottom, #444, #222);
+  color: #fff;
+  box-shadow: 0 3px 0 #000, 0 5px 10px rgba(0,0,0,0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#top-large button:hover,
+#top-small button:hover {
+  background: linear-gradient(to bottom, #555, #333);
+  box-shadow: 0 2px 0 #111, 0 4px 8px rgba(0,0,0,0.5);
+  transform: translateY(1px);
+}
+
+#top-large button:active,
+#top-small button:active {
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.7);
+  transform: translateY(2px);
+}
+
+/* ヘッダーの文字色も黒系に */
+#top-large h1 {
+  color: #fff;
+}
+
+/* 背景全体をブラックに */
+body {
+  background: #111;
+  color: #fff;
+}
+
+/* 小ヘッダー透過部分も黒系 */
+#top-small {
+  background: rgba(30,30,30,0.85);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+#top-small input,
+#top-small button {
+  background: rgba(50,50,50,0.9);
+  color: #fff;
+}
