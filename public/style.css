@@ -1,35 +1,68 @@
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
+
+#top-large {
+  text-align: center;
+  margin-top: 100px;
+}
+
+#top-large h1 {
+  font-size: 64px;
+  margin-bottom: 40px;
+}
+
+#top-large input {
+  width: 400px;
+  padding: 12px;
+  font-size: 18px;
+}
+
+#top-large button {
+  padding: 12px 20px;
+  font-size: 18px;
+}
+
 #top-small {
   position: fixed;
   top: -60px; /* 初期は画面外 */
   left: 0;
   width: 100%;
-  background: rgba(255, 255, 255, 0.85); /* 半透明に変更 */
+  background: #fff;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 10px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  transition: top 0.3s ease, backdrop-filter 0.3s ease; /* スライドアニメーション + 透過 */
-  backdrop-filter: blur(6px); /* 背景ぼかしで見やすく */
+  transition: top 0.3s ease; /* スライドアニメーション */
   z-index: 1000;
-  border-bottom: 1px solid rgba(0,0,0,0.1); /* 軽く境界線 */
 }
 
 #top-small input {
   width: 60%;
   padding: 6px;
   font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.9); /* 入力欄も半透明 */
 }
 
 #top-small button {
   padding: 6px 14px;
   font-size: 16px;
-  margin-left: 6px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  background: rgba(255,255,255,0.9);
-  cursor: pointer;
+}
+
+#content {
+  margin-top: 20px;
+}
+/* ------------------------- */
+/* 透過・ぼかし追加部分 */
+/* ------------------------- */
+#top-small {
+  background: rgba(255, 255, 255, 0.85); /* 半透明 */
+  backdrop-filter: blur(6px);            /* 背景をぼかす */
+  border-bottom: 1px solid rgba(0,0,0,0.1); /* 軽い下線で境界を出す */
+}
+
+#top-small input,
+#top-small button {
+  background: rgba(255, 255, 255, 0.9); /* 半透明に統一 */
 }
