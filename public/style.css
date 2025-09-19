@@ -1,174 +1,71 @@
+/* ------------------------- */
+/* 立体感のあるグレーUI */
+/* ------------------------- */
+
+/* 背景を濃いグレー、文字は白系でコントラスト */
 body {
-  margin: 0;
-  font-family: sans-serif;
+  background: #222;
+  color: #eee;
 }
 
-#top-large {
-  text-align: center;
-  margin-top: 100px;
-}
-
+/* 大見出し */
 #top-large h1 {
-  font-size: 64px;
-  margin-bottom: 40px;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
-#top-large input {
-  width: 400px;
-  padding: 12px;
-  font-size: 18px;
-}
-
-#top-large button {
-  padding: 12px 20px;
-  font-size: 18px;
-}
-
-#top-small {
-  position: fixed;
-  top: -60px; /* 初期は画面外 */
-  left: 0;
-  width: 100%;
-  background: #fff;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  transition: top 0.3s ease; /* スライドアニメーション */
-  z-index: 1000;
-}
-
-#top-small input {
-  width: 60%;
-  padding: 6px;
-  font-size: 16px;
-}
-
-#top-small button {
-  padding: 6px 14px;
-  font-size: 16px;
-}
-
-#content {
-  margin-top: 20px;
-}
-/* ------------------------- */
-/* 透過・ぼかし追加部分 */
-/* ------------------------- */
-#top-small {
-  background: rgba(255, 255, 255, 0.85); /* 半透明 */
-  backdrop-filter: blur(6px);            /* 背景をぼかす */
-  border-bottom: 1px solid rgba(0,0,0,0.1); /* 軽い下線で境界を出す */
-}
-
-#top-small input,
-#top-small button {
-  background: rgba(255, 255, 255, 0.9); /* 半透明に統一 */
-}
-/* ------------------------- */
-/* 2010年代風立体ボタン・入力追加 */
-/* ------------------------- */
+/* 入力欄（トップと固定バー共通） */
 #top-large input,
 #top-small input {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid #777;
+  border-radius: 6px;
+  background: linear-gradient(to bottom, #666, #444);
+  color: #fff;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 3px 6px rgba(0,0,0,0.4);
   transition: all 0.2s ease;
 }
 
 #top-large input:focus,
 #top-small input:focus {
-  border-color: #888;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.2);
+  border-color: #aaa;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.6), 0 3px 6px rgba(0,0,0,0.5);
   outline: none;
 }
 
+/* ボタン */
 #top-large button,
 #top-small button {
-  border: 1px solid #888;
-  border-radius: 4px;
-  background: linear-gradient(to bottom, #f0f0f0, #dcdcdc);
-  box-shadow: 0 3px 0 #aaa, 0 5px 10px rgba(0,0,0,0.2);
+  border: 1px solid #999;
+  border-radius: 6px;
+  background: linear-gradient(to bottom, #bbb, #888);
+  color: #222;
+  font-weight: bold;
+  box-shadow: 0 4px 0 #555, 0 6px 10px rgba(0,0,0,0.4);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 #top-large button:hover,
 #top-small button:hover {
-  background: linear-gradient(to bottom, #e0e0e0, #cccccc);
-  box-shadow: 0 2px 0 #888, 0 4px 8px rgba(0,0,0,0.2);
+  background: linear-gradient(to bottom, #ccc, #999);
+  box-shadow: 0 3px 0 #444, 0 5px 8px rgba(0,0,0,0.4);
   transform: translateY(1px);
 }
 
 #top-large button:active,
 #top-small button:active {
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-  transform: translateY(2px);
-}
-/* ------------------------- */
-/* 2010年代風立体ボタン・入力（ブラックテーマ） */
-/* ------------------------- */
-#top-large input,
-#top-small input {
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: rgba(20, 20, 20, 0.9);
-  color: #fff;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.5);
-  transition: all 0.2s ease;
-}
-
-#top-large input:focus,
-#top-small input:focus {
-  border-color: #888;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.7);
-  outline: none;
-}
-
-#top-large button,
-#top-small button {
-  border: 1px solid #888;
-  border-radius: 4px;
-  background: linear-gradient(to bottom, #444, #222);
-  color: #fff;
-  box-shadow: 0 3px 0 #000, 0 5px 10px rgba(0,0,0,0.5);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-#top-large button:hover,
-#top-small button:hover {
-  background: linear-gradient(to bottom, #555, #333);
-  box-shadow: 0 2px 0 #111, 0 4px 8px rgba(0,0,0,0.5);
-  transform: translateY(1px);
-}
-
-#top-large button:active,
-#top-small button:active {
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.7);
+  box-shadow: inset 0 3px 5px rgba(0,0,0,0.6);
   transform: translateY(2px);
 }
 
-/* ヘッダーの文字色も黒系に */
-#top-large h1 {
-  color: #fff;
-}
-
-/* 背景全体をブラックに */
-body {
-  background: #111;
-  color: #fff;
-}
-
-/* 小ヘッダー透過部分も黒系 */
+/* 固定バーの透過感 */
 #top-small {
-  background: rgba(30,30,30,0.85);
+  background: rgba(60,60,60,0.85); /* 半透明グレー */
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 #top-small input,
 #top-small button {
-  background: rgba(50,50,50,0.9);
+  background: rgba(100,100,100,0.9);
   color: #fff;
 }
