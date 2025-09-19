@@ -13,3 +13,12 @@
     "cheerio": "^1.0.0-rc.12"
   }
 }
+{
+  "scripts": {
+    "start": "node server.js",
+    "postinstall": "npx playwright install --with-deps"
+  },
+  "dependencies": {
+    // ...既存
+  }
+}
