@@ -256,3 +256,62 @@ router.get("/", async (req, res) => {
 });
 
 module.exports = router;
+// --- 追加する Playwright フォールバック関数 ---
+// ファイル上部（他 require の近く）に追加
+async function fetchWithPlaywright(url) {
+  // lazy load so server can start without playwright installed
+  let playwright;
+  try {
+    playwright = require('playwright'); // require が失敗すると例外になる
+  } catch (e) {
+    console.error('[proxy] playwright not installed:', e.message);
+    throw new Error('playwright-not-installed');
+  }
+
+  const browser = await playwright.chromium.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: true
+  });
+  try {
+    const page = await browser.newPage({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    });
+    // optional timeout and waitUntil adjust as needed
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    const content = await page.content();
+    // gather cookies to reuse if needed
+    try {
+      const cookies = await page.context().cookies();
+      const host = new URL(url).hostname;
+      const map = cookieStore.get(host) || {};
+      cookies.forEach(c => { map[c.name] = c.value; });
+      cookieStore.set(host, map);
+    } catch (e) {
+      console.warn('[proxy] playwright cookie store failed', e.message);
+    }
+    return { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, data: Buffer.from(content, 'utf8') };
+  } finally {
+    await browser.close();
+  }
+}
+// ...取得後の処理（既存の resp がここにある想定）
+// もし 403 なら Playwright フォールバックを試す
+if (resp.status === 403) {
+  console.warn('[proxy] received 403, attempting Playwright fallback for', targetUrl);
+  try {
+    // allow explicit override via query ?forcePlaywright=1
+    if (req.query.forcePlaywright === '1') {
+      const pwResp = await fetchWithPlaywright(targetUrl);
+      res.set('Content-Type', pwResp.headers['content-type'] || 'text/html; charset=utf-8');
+      return res.status(pwResp.status || 200).send(pwResp.data);
+    }
+    // automatic attempt
+    const pwResp = await fetchWithPlaywright(targetUrl);
+    console.log('[proxy] Playwright succeeded, returning rendered HTML');
+    res.set('Content-Type', pwResp.headers['content-type'] || 'text/html; charset=utf-8');
+    return res.status(pwResp.status || 200).send(pwResp.data);
+  } catch (e) {
+    console.warn('[proxy] playwright fallback failed:', e.message);
+    // fallback failed: 続行して通常の 403 ハンドリングへ（ログを返す等）
+  }
+}
