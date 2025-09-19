@@ -3,17 +3,46 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const router = express.Router();
 
+// -----------------------------
+// トップページとプロキシ処理
+// -----------------------------
 router.get("/", async (req, res) => {
   const targetUrl = req.query.url;
 
+  // -----------------------------
+  // トップページ表示
+  // -----------------------------
   if (!targetUrl) {
-    return res.status(400).send("Missing url parameter");
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Yubikiri Proxy</title>
+        <style>
+          body { margin: 0; font-family: sans-serif; text-align: center; margin-top: 100px; }
+          h1 { font-size: 64px; margin-bottom: 40px; }
+          input { width: 400px; padding: 12px; font-size: 18px; }
+          button { padding: 12px 20px; font-size: 18px; }
+        </style>
+      </head>
+      <body>
+        <h1>Yubikiri Proxy</h1>
+        <form method="get">
+          <input type="text" name="url" placeholder="Enter URL" />
+          <button type="submit">GO</button>
+        </form>
+      </body>
+      </html>
+    `);
   }
 
+  // -----------------------------
+  // プロキシ処理
+  // -----------------------------
   try {
-    // HTML やリソースを取得
     const response = await axios.get(targetUrl, {
-      responseType: "arraybuffer", // バイナリも受け取れるようにする
+      responseType: "arraybuffer",
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -22,14 +51,11 @@ router.get("/", async (req, res) => {
 
     const contentType = response.headers["content-type"] || "";
 
-    // ------------------------------
-    // HTML の場合
-    // ------------------------------
     if (contentType.includes("text/html")) {
       const html = response.data.toString("utf-8");
       const $ = cheerio.load(html);
 
-      // <img>
+      // img, link, script タグを書き換え
       $("img").each((_, el) => {
         const src = $(el).attr("src");
         if (src && !src.startsWith("data:")) {
@@ -37,7 +63,6 @@ router.get("/", async (req, res) => {
         }
       });
 
-      // <link>
       $("link").each((_, el) => {
         const href = $(el).attr("href");
         if (href) {
@@ -45,7 +70,6 @@ router.get("/", async (req, res) => {
         }
       });
 
-      // <script>
       $("script").each((_, el) => {
         const src = $(el).attr("src");
         if (src) {
@@ -53,40 +77,10 @@ router.get("/", async (req, res) => {
         }
       });
 
-      // <style> 内の url(...)
-      $("style").each((_, el) => {
-        let styleContent = $(el).html();
-        styleContent = styleContent.replace(/url\(([^)]+)\)/g, (match, url) => {
-          const cleanUrl = url.replace(/['"]/g, "");
-          return `url(/proxy?url=${encodeURIComponent(new URL(cleanUrl, targetUrl))})`;
-        });
-        $(el).html(styleContent);
-      });
-
       res.set("Content-Type", "text/html");
       res.send($.html());
-    }
-
-    // ------------------------------
-    // CSS の場合（外部 CSS）
-    // ------------------------------
-    else if (contentType.includes("text/css")) {
-      let css = response.data.toString("utf-8");
-
-      // CSS 内の url(...) を全部書き換え
-      css = css.replace(/url\(([^)]+)\)/g, (match, url) => {
-        const cleanUrl = url.replace(/['"]/g, "");
-        return `url(/proxy?url=${encodeURIComponent(new URL(cleanUrl, targetUrl))})`;
-      });
-
-      res.set("Content-Type", "text/css");
-      res.send(css);
-    }
-
-    // ------------------------------
-    // それ以外（画像, フォント, JS など）
-    // ------------------------------
-    else {
+    } else {
+      // HTML以外のリソースはそのまま返す
       res.set("Content-Type", contentType);
       res.send(response.data);
     }
