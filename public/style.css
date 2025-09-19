@@ -3,53 +3,53 @@ body {
   font-family: sans-serif;
 }
 
-/* 大きな初期検索ボックス */
 #top-large {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  background-color: #fff;
+  text-align: center;
+  margin-top: 100px;
 }
 
 #top-large h1 {
-  font-size: 2em;
-  margin-bottom: 20px;
+  font-size: 64px;
+  margin-bottom: 40px;
 }
 
 #top-large input {
-  width: 80%;
-  max-width: 600px;
-  padding: 10px;
-  font-size: 1em;
+  width: 400px;
+  padding: 12px;
+  font-size: 18px;
 }
 
 #top-large button {
-  margin-top: 10px;
-  padding: 10px 20px;
+  padding: 12px 20px;
+  font-size: 18px;
 }
 
-/* 上部に出てくる小さなURLバー */
 #top-small {
   position: fixed;
-  top: 0;
+  top: -60px; /* 初期は画面外 */
   left: 0;
   width: 100%;
-  background-color: rgba(255,255,255,0.95);
-  display: none; /* 初期は非表示 */
-  padding: 5px 10px;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+  background: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: top 0.3s ease; /* スライドアニメーション */
   z-index: 1000;
 }
 
 #top-small input {
-  width: 90%;
-  padding: 5px;
+  width: 60%;
+  padding: 6px;
+  font-size: 16px;
+}
+
+#top-small button {
+  padding: 6px 14px;
+  font-size: 16px;
 }
 
 #content {
-  width: 100%;
-  height: 100vh;
-  overflow: auto;
+  margin-top: 20px;
 }
