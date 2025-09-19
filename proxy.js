@@ -11,9 +11,9 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    // axiosで取得
+    // HTML やリソースを取得
     const response = await axios.get(targetUrl, {
-      responseType: "arraybuffer",
+      responseType: "arraybuffer", // バイナリも受け取れるようにする
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -22,12 +22,14 @@ router.get("/", async (req, res) => {
 
     const contentType = response.headers["content-type"] || "";
 
+    // ------------------------------
+    // HTML の場合
+    // ------------------------------
     if (contentType.includes("text/html")) {
-      // HTMLの場合 → cheerioでリンク書き換え
       const html = response.data.toString("utf-8");
       const $ = cheerio.load(html);
 
-      // img, link, script タグを書き換え
+      // <img>
       $("img").each((_, el) => {
         const src = $(el).attr("src");
         if (src && !src.startsWith("data:")) {
@@ -35,6 +37,7 @@ router.get("/", async (req, res) => {
         }
       });
 
+      // <link>
       $("link").each((_, el) => {
         const href = $(el).attr("href");
         if (href) {
@@ -42,6 +45,7 @@ router.get("/", async (req, res) => {
         }
       });
 
+      // <script>
       $("script").each((_, el) => {
         const src = $(el).attr("src");
         if (src) {
@@ -49,7 +53,7 @@ router.get("/", async (req, res) => {
         }
       });
 
-      // CSS 内の url(...) を書き換え（フォント・画像対応）
+      // <style> 内の url(...)
       $("style").each((_, el) => {
         let styleContent = $(el).html();
         styleContent = styleContent.replace(/url\(([^)]+)\)/g, (match, url) => {
@@ -61,8 +65,28 @@ router.get("/", async (req, res) => {
 
       res.set("Content-Type", "text/html");
       res.send($.html());
-    } else {
-      // HTML以外（CSS, JS, 画像, フォントなど）はそのまま返す
+    }
+
+    // ------------------------------
+    // CSS の場合（外部 CSS）
+    // ------------------------------
+    else if (contentType.includes("text/css")) {
+      let css = response.data.toString("utf-8");
+
+      // CSS 内の url(...) を全部書き換え
+      css = css.replace(/url\(([^)]+)\)/g, (match, url) => {
+        const cleanUrl = url.replace(/['"]/g, "");
+        return `url(/proxy?url=${encodeURIComponent(new URL(cleanUrl, targetUrl))})`;
+      });
+
+      res.set("Content-Type", "text/css");
+      res.send(css);
+    }
+
+    // ------------------------------
+    // それ以外（画像, フォント, JS など）
+    // ------------------------------
+    else {
       res.set("Content-Type", contentType);
       res.send(response.data);
     }
