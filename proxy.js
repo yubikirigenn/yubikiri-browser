@@ -1,43 +1,36 @@
 const express = require("express");
-const axios = require("axios").default;
-require("axios-cookiejar-support").default(axios); // axiosを拡張
-const tough = require("tough-cookie");
+const axios = require("axios");
 const cheerio = require("cheerio");
 const router = express.Router();
 
+// 全リクエスト共通プロキシ
 router.get("/", async (req, res) => {
   const targetUrl = req.query.url;
-
-  if (!targetUrl) {
-    return res.status(400).send("Missing url parameter");
-  }
+  if (!targetUrl) return res.status(400).send("Missing url parameter");
 
   try {
-    const jar = new tough.CookieJar();
-
+    // バイナリも含めて取得
     const response = await axios.get(targetUrl, {
-      jar,
-      withCredentials: true,
       responseType: "arraybuffer",
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": targetUrl,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive"
-      },
-      maxRedirects: 5,
-      validateStatus: (status) => status < 500 // 4xxも返す
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
     });
 
     const contentType = response.headers["content-type"] || "";
 
     if (contentType.includes("text/html")) {
+      // HTML の場合
       const html = response.data.toString("utf-8");
       const $ = cheerio.load(html);
 
-      // img, link, script タグを書き換え
+      // 相対パス補正
+      if ($("head base").length === 0) {
+        $("head").prepend(`<base href="${targetUrl}">`);
+      }
+
+      // 画像をプロキシ経由
       $("img").each((_, el) => {
         const src = $(el).attr("src");
         if (src && !src.startsWith("data:")) {
@@ -45,27 +38,46 @@ router.get("/", async (req, res) => {
         }
       });
 
-      $("link").each((_, el) => {
+      // CSS
+      $("link[rel='stylesheet']").each((_, el) => {
         const href = $(el).attr("href");
-        if (href) {
+        if (href && href.startsWith("http")) {
           $(el).attr("href", `/proxy?url=${encodeURIComponent(new URL(href, targetUrl))}`);
         }
       });
 
+      // JS
       $("script").each((_, el) => {
         const src = $(el).attr("src");
-        if (src) {
+        if (src && src.startsWith("http")) {
           $(el).attr("src", `/proxy?url=${encodeURIComponent(new URL(src, targetUrl))}`);
+        }
+      });
+
+      // フォント等も CSS 内にある場合、URLを書き換え可能（高度）
+      $("style").each((_, el) => {
+        const styleContent = $(el).html();
+        if (styleContent.includes("url(")) {
+          const newStyle = styleContent.replace(/url\((.*?)\)/g, (match, p1) => {
+            let url = p1.replace(/['"]/g, "").trim();
+            if (!url.startsWith("data:") && url.startsWith("http")) {
+              return `url(/proxy?url=${encodeURIComponent(url)})`;
+            }
+            return match;
+          });
+          $(el).html(newStyle);
         }
       });
 
       res.set("Content-Type", "text/html");
       res.send($.html());
+
     } else {
-      // HTML以外（CSS, JS, 画像など）
+      // HTML以外のリソース
       res.set("Content-Type", contentType);
       res.send(response.data);
     }
+
   } catch (err) {
     console.error("Proxy error:", err.message);
     res.status(500).send("Proxy error: " + err.message);
