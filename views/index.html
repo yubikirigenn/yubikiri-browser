@@ -1,25 +1,29 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>yubikiri-proxy</title>
-  <link rel="stylesheet" href="/style.css">
-  <script src="/script.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>yubikiri-proxy</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- トップページ用の大きな検索フォーム -->
-  <div id="top-large">
-    <h1>yubikiri-proxy</h1>
-    <input type="text" id="big-input" placeholder="URLを入力">
-    <button id="big-go">GO</button>
-  </div>
 
-  <!-- サイト表示中にスライドで出てくる小さなURLバー -->
-  <div id="top-small">
-    <input type="text" id="small-input" placeholder="URLを入力">
-    <button id="small-go">GO</button>
-  </div>
+<!-- 大きいトップページ用検索 -->
+<div id="top-large">
+  <h1>yubikiri-proxy</h1>
+  <input type="text" placeholder="URL または検索語を入力">
+  <button>GO</button>
+</div>
 
-  <div id="content"></div>
+<!-- 上部固定小さいバー（スクロール時表示） -->
+<div id="top-small">
+  <input type="text" placeholder="URL または検索語を入力">
+  <button>GO</button>
+</div>
+
+<!-- プロキシで読み込んだコンテンツ表示用 -->
+<div id="content"></div>
+
+<script src="script.js"></script>
 </body>
 </html>
