@@ -1,4 +1,4 @@
-async function fetchPage() {
+」async function fetchPage() {
   const url = encodeURIComponent("https://www.amazon.co.jp/");
   try {
     const res = await fetch(`/proxy?url=${url}`);
@@ -7,7 +7,7 @@ async function fetchPage() {
     document.getElementById("content").innerHTML = html;
   } catch (err) {
     console.error("Client fetch error:", err);
-    document.getElementById("content").innerText = "読み込みに失敗しました";
+    document.getElementById("content").innerText = "Failed to load page";
   }
 }
 
