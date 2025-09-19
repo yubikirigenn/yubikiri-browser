@@ -1,28 +1,33 @@
-// server.js
-const express = require('express');
-const path = require('path');
-const proxyRouter = require('./proxy'); // ルートに置く proxy.js
+import express from "express";
+import fetch from "node-fetch";
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
-// 静的ファイル（public フォルダ）
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-// ルートページ
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
-});
+app.get("/proxy", async (req, res) => {
+  try {
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).send("No URL provided");
 
-// /proxy にプロキシルータを割り当て
-app.use('/proxy', proxyRouter);
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "*/*"
+      }
+    });
 
-// エラーハンドラ（最低限）
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err && err.stack ? err.stack : err);
-  res.status(500).send('Server error');
+    const contentType = response.headers.get("content-type");
+    res.setHeader("Content-Type", contentType);
+    const body = await response.arrayBuffer();
+    res.send(Buffer.from(body));
+  } catch (err) {
+    console.error("Proxy error:", err);
+    res.status(500).send("Proxy error");
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ yubikiri-proxy running at http://localhost:${PORT}`);
+  console.log(`Proxy server running on port ${PORT}`);
 });
