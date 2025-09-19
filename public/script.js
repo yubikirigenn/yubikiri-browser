@@ -13,16 +13,15 @@ async function loadSite(url) {
   if (!url) return;
 
   try {
-    // URLをエンコードしてプロキシ経由で取得
     const res = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
     const html = await res.text();
     content.innerHTML = html;
 
-    // トップページの大きいフォームを隠す
+    // トップページの大きなフォームを隠す
     topLarge.style.display = 'none';
 
-    // 上部URLバーを有効に
-    topSmall.style.display = 'none'; // 初期は非表示
+    // 上部URLバーは画面外からスライドで表示される
+    topSmall.style.top = '-60px'; // 初期は隠す
   } catch (err) {
     content.innerHTML = `<p style="color:red;">読み込みエラー: ${err.message}</p>`;
   }
@@ -40,11 +39,13 @@ smallInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') loadSite(smallInput.value);
 });
 
-// マウスカーソルが上に来たら小さなバーを表示
+// マウスカーソルが上に来たら小さなバーをスライドで表示
 document.addEventListener('mousemove', e => {
-  if (content.innerHTML !== '' && e.clientY < 50) {
-    topSmall.style.display = 'flex';
-  } else if (content.innerHTML !== '' && e.clientY > 80) {
-    topSmall.style.display = 'none';
+  if (content.innerHTML !== '') {
+    if (e.clientY < 50) {
+      topSmall.style.top = '0';
+    } else if (e.clientY > 80) {
+      topSmall.style.top = '-60px';
+    }
   }
 });
