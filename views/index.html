@@ -1,25 +1,25 @@
-<div id="viewer"></div>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>yubikiri-proxy</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/script.js" defer></script>
+</head>
+<body>
+  <!-- トップページ用の大きな検索フォーム -->
+  <div id="top-large">
+    <h1>yubikiri-proxy</h1>
+    <input type="text" id="big-input" placeholder="URLを入力">
+    <button id="big-go">GO</button>
+  </div>
 
-<script>
-async function openSite(url) {
-  const r = await fetch('/proxy/can-iframe?url=' + encodeURIComponent(url));
-  const j = await r.json();
-  const viewer = document.getElementById('viewer');
-  viewer.innerHTML = ''; // クリア
+  <!-- サイト表示中にスライドで出てくる小さなURLバー -->
+  <div id="top-small">
+    <input type="text" id="small-input" placeholder="URLを入力">
+    <button id="small-go">GO</button>
+  </div>
 
-  const iframe = document.createElement('iframe');
-  iframe.style.width = '100%';
-  iframe.style.height = '100vh';
-  iframe.frameBorder = '0';
-
-  if (j.allowIframe) {
-    // iframe 埋め込み可能
-    iframe.src = url;
-  } else {
-    // 埋め込み不可 → プロキシ経由
-    iframe.src = '/proxy?url=' + encodeURIComponent(url);
-  }
-
-  viewer.appendChild(iframe);
-}
-</script>
+  <div id="content"></div>
+</body>
+</html>
