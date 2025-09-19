@@ -4,29 +4,17 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   const targetUrl = req.query.url;
-  if (!targetUrl) return res.status(400).send("Missing url parameter");
+  if (!targetUrl) return res.status(400).send("Missing url");
 
   try {
-    // UTF-8文字列として取得
     const response = await axios.get(targetUrl, {
-      responseType: "text",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      }
+      headers: { "User-Agent": "Mozilla/5.0" }
     });
-
-    const contentType = response.headers["content-type"] || "";
-
-    if (contentType.includes("text/html")) {
-      res.set("Content-Type", "text/html; charset=UTF-8");
-      res.send(response.data); // 文字列として送信
-    } else {
-      res.status(400).send("Only HTML supported in this minimal proxy");
-    }
+    res.set("Content-Type", "text/html");
+    res.send(response.data);
   } catch (err) {
-    console.error("Proxy error:", err.message);
-    res.status(500).send("Proxy error: " + err.message);
+    console.error("Proxy fetch error:", err.message);
+    res.status(500).send("Proxy fetch error");
   }
 });
 
