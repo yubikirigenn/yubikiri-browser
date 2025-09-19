@@ -1,13 +1,9 @@
-const express = require("express");
-const axios = require("axios");
-const cheerio = require("cheerio");
-const router = express.Router();
-
-router.get("/", async (req, res) => {
+app.get("/proxy", async (req, res) => {
   const targetUrl = req.query.url;
 
   if (!targetUrl) {
-    return res.status(400).send("Missing url parameter");
+    console.error("No target URL provided");
+    return res.status(400).send("Missing 'url' parameter");
   }
 
   try {
@@ -15,50 +11,31 @@ router.get("/", async (req, res) => {
       responseType: "arraybuffer",
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      }
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "ja,en;q=0.9",
+      },
     });
 
-    const contentType = response.headers["content-type"] || "";
-
-    if (contentType.includes("text/html")) {
-      // HTMLの場合、リンク書き換え
-      const html = response.data.toString("utf-8");
-      const $ = cheerio.load(html);
-
-      // img, link, script タグを書き換え
-      $("img").each((_, el) => {
-        const src = $(el).attr("src");
-        if (src && !src.startsWith("data:")) {
-          $(el).attr("src", `/proxy?url=${encodeURIComponent(new URL(src, targetUrl))}`);
-        }
-      });
-
-      $("link").each((_, el) => {
-        const href = $(el).attr("href");
-        if (href) {
-          $(el).attr("href", `/proxy?url=${encodeURIComponent(new URL(href, targetUrl))}`);
-        }
-      });
-
-      $("script").each((_, el) => {
-        const src = $(el).attr("src");
-        if (src) {
-          $(el).attr("src", `/proxy?url=${encodeURIComponent(new URL(src, targetUrl))}`);
-        }
-      });
-
-      res.set("Content-Type", "text/html");
-      res.send($.html());
-    } else {
-      // HTML以外のリソースはそのまま返す
-      res.set("Content-Type", contentType);
-      res.send(response.data);
-    }
+    res.set("Content-Type", response.headers["content-type"]);
+    res.send(response.data);
   } catch (err) {
-    console.error("Proxy error:", err.message);
-    res.status(500).send("Proxy error: " + err.message);
+    console.error("=== Proxy Error Start ===");
+    console.error("URL:", targetUrl);
+    if (err.response) {
+      console.error("Status:", err.response.status);
+      console.error("Headers:", err.response.headers);
+    } else if (err.request) {
+      console.error("No response received");
+      console.error(err.request);
+    } else {
+      console.error("Error message:", err.message);
+    }
+    console.error("=== Proxy Error End ===");
+
+    res
+      .status(500)
+      .send("Proxy error: " + (err.response ? err.response.status : err.message));
   }
 });
-
-module.exports = router;
