@@ -4,38 +4,47 @@ const topSmall = document.getElementById('top-small');
 
 const bigInput = document.getElementById('big-input');
 const bigGo = document.getElementById('big-go');
+
 const smallInput = document.getElementById('small-input');
 const smallGo = document.getElementById('small-go');
 
-// URLを表示する関数
-async function loadURL(url) {
+// サイトを表示する関数
+async function loadSite(url) {
+  if (!url) return;
+
   try {
-    content.innerHTML = "読み込み中...";
+    // URLをエンコードしてプロキシ経由で取得
     const res = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
     const html = await res.text();
     content.innerHTML = html;
 
-    // 大きな検索ボックスは非表示
+    // トップページの大きいフォームを隠す
     topLarge.style.display = 'none';
+
+    // 上部URLバーを有効に
+    topSmall.style.display = 'none'; // 初期は非表示
   } catch (err) {
-    content.innerHTML = "読み込みに失敗しました";
-    console.error(err);
+    content.innerHTML = `<p style="color:red;">読み込みエラー: ${err.message}</p>`;
   }
 }
 
-// 大きな検索ボックスから開く
-bigGo.addEventListener('click', () => loadURL(bigInput.value));
-bigInput.addEventListener('keydown', e => { if(e.key==='Enter') loadURL(bigInput.value); });
+// トップページの大きい検索バー
+bigGo.addEventListener('click', () => loadSite(bigInput.value));
+bigInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadSite(bigInput.value);
+});
 
-// 小さなURLバーから開く
-smallGo.addEventListener('click', () => loadURL(smallInput.value));
-smallInput.addEventListener('keydown', e => { if(e.key==='Enter') loadURL(smallInput.value); });
+// 上部URLバー（サイト表示中）
+smallGo.addEventListener('click', () => loadSite(smallInput.value));
+smallInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadSite(smallInput.value);
+});
 
-// マウスが上に来たら小さいURLバーを表示
+// マウスカーソルが上に来たら小さなバーを表示
 document.addEventListener('mousemove', e => {
-  if(e.clientY < 50) {
+  if (content.innerHTML !== '' && e.clientY < 50) {
     topSmall.style.display = 'flex';
-  } else {
+  } else if (content.innerHTML !== '' && e.clientY > 80) {
     topSmall.style.display = 'none';
   }
 });
