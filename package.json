@@ -19,6 +19,6 @@
     "postinstall": "npx playwright install --with-deps"
   },
   "dependencies": {
-    // ...既存
+    
   }
 }
