@@ -7,24 +7,19 @@
   <script src="/script.js" defer></script>
 </head>
 <body>
-  <!-- 大きな初期検索ボックス -->
-  <header id="top-large">
+  <!-- トップページ用の大きな検索フォーム -->
+  <div id="top-large">
     <h1>yubikiri-proxy</h1>
-    <form id="big-form" onsubmit="return false;">
-      <input id="big-input" type="text" placeholder="https://example.com/ を入力して Enter" autocomplete="off">
-      <button id="big-go" type="button">開く</button>
-    </form>
-  </header>
+    <input type="text" id="big-input" placeholder="URLを入力">
+    <button id="big-go">GO</button>
+  </div>
 
-  <!-- 上部に出てくる小さなURLバー -->
-  <header id="top-small">
-    <form id="small-form" onsubmit="return false;">
-      <input id="small-input" type="text" placeholder="URLを入力して Enter">
-      <button id="small-go" type="button">開く</button>
-    </form>
-  </header>
+  <!-- サイト表示中にスライドで出てくる小さなURLバー -->
+  <div id="top-small">
+    <input type="text" id="small-input" placeholder="URLを入力">
+    <button id="small-go">GO</button>
+  </div>
 
-  <!-- プロキシで表示するサイト -->
-  <div id="content">ここにサイトが表示されます</div>
+  <div id="content"></div>
 </body>
 </html>
