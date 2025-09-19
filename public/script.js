@@ -4,18 +4,9 @@ let proxiedActive = false;
 // 初期化
 // =============================
 window.addEventListener("DOMContentLoaded", () => {
-  const searchForm = document.getElementById("search-form");
-  const searchInput = document.getElementById("search-input");
-
-  if (searchForm) {
-    searchForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const query = searchInput.value.trim();
-      if (query) {
-        loadSite(query);
-      }
-    });
-  }
+  wireSearchBoxes();
+  wireTopBarAutoShow();
+  setTopSmallVisible(false); // 最初は小バー非表示
 });
 
 // =============================
@@ -33,14 +24,12 @@ async function loadSite(url) {
   // === URL を決定 ===
   let target;
   if (looksLikeUrl(url)) {
-    // scheme がない場合は https:// を補完
     if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(url)) {
       target = "https://" + url;
     } else {
       target = url;
     }
   } else {
-    // Google 検索（proxy経由）
     const q = encodeURIComponent(url);
     target = `https://www.google.com/search?q=${q}`;
   }
@@ -51,12 +40,9 @@ async function loadSite(url) {
     if (!res.ok) throw new Error("HTTP error! status: " + res.status);
     const html = await res.text();
 
-    // ページ内容を置き換え
     content.innerHTML = html;
-
     proxiedActive = true;
 
-    // ✅ トップページを隠す
     if (topLarge) {
       topLarge.style.display = "none";
     }
@@ -76,7 +62,7 @@ async function loadSite(url) {
 
 // URLらしいかを判定
 function looksLikeUrl(str) {
-  return /\./.test(str); // 簡易判定（ドメインっぽければURL扱い）
+  return /\./.test(str);
 }
 
 // 小さいバーの表示/非表示
@@ -85,6 +71,63 @@ function setTopSmallVisible(visible) {
   if (topSmall) {
     topSmall.style.display = visible ? "block" : "none";
   }
+}
+
+// =============================
+// 検索ボックスの動作を紐づけ
+// =============================
+function wireSearchBoxes() {
+  const largeInput = document.querySelector("#top-large input");
+  const largeButton = document.getElementById("top-large-go");
+  const smallInput = document.querySelector("#top-small input");
+  const smallButton = document.getElementById("top-small-go");
+
+  if (largeButton) {
+    largeButton.addEventListener("click", () => {
+      const v = largeInput.value.trim();
+      if (v) loadSite(v);
+    });
+  }
+  if (largeInput) {
+    largeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const v = largeInput.value.trim();
+        if (v) loadSite(v);
+      }
+    });
+  }
+
+  if (smallButton) {
+    smallButton.addEventListener("click", () => {
+      const v = smallInput.value.trim();
+      if (v) loadSite(v);
+    });
+  }
+  if (smallInput) {
+    smallInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const v = smallInput.value.trim();
+        if (v) loadSite(v);
+      }
+    });
+  }
+}
+
+// =============================
+// 上部バーの自動表示/非表示
+// =============================
+function wireTopBarAutoShow() {
+  let hideTimer = null;
+  document.addEventListener("mousemove", (e) => {
+    if (!proxiedActive) return;
+    if (e.clientY <= 40) {
+      clearTimeout(hideTimer);
+      setTopSmallVisible(true);
+    } else {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setTopSmallVisible(false), 700);
+    }
+  });
 }
 
 // =============================
