@@ -5,7 +5,7 @@ const proxyRouter = require('./proxy');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 静的ファイル
+// 静的ファイル (public 配下)
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ルートページ
