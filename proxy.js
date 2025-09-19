@@ -1,24 +1,29 @@
 const express = require('express');
 const axios = require('axios');
-const { wrapper } = require('axios-cookiejar-support');
+const axiosCookieJarSupport = require('axios-cookiejar-support').default;
 const tough = require('tough-cookie');
 const cheerio = require('cheerio');
 
 const router = express.Router();
 
-// CookieJar を作成して axios にラップ
+// CookieJar を作成
 const jar = new tough.CookieJar();
-const client = wrapper(axios.create({ jar }));
+
+// axios に CookieJar を適用
+axiosCookieJarSupport(axios);
 
 router.get('/', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send("Missing url parameter");
 
   try {
-    const response = await client.get(targetUrl, {
+    const response = await axios.get(targetUrl, {
+      jar,
+      withCredentials: true,
       responseType: 'arraybuffer',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
