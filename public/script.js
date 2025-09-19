@@ -1,101 +1,125 @@
-// === 変更 / 追加するコード（public/script.js） ===
+// public/script.js - 上部バーの表示を安定化する修正版
+// ※HTML/CSS は変更しない前提（index.html はそのまま）
+// ※既存の loadSite() ロジックをベースにしている場合は関数名を合わせてください。
+//    ここではあなたが渡してくれた loadSite 関数をそのまま使う前提で wire をつなぎます。
 
-// 既存の簡易 fetchPage を置き換える形で下記を使ってください。
-// 変更なしの部分は省略しています（あなたの既存UIに合わせる想定）。
-
-let proxiedActive = false; // プロキシで外部サイトを表示中か
+let proxiedActive = false;
 let hideTimer = null;
+let showDebounce = null;
+const SHOW_THRESHOLD = 40; // 上端からのピクセル閾値
+const HIDE_DELAY = 700; // ms
 
-// utility: 表示/非表示（高さを取得して確実に隠す）
+function ensureBarInit() {
+  const bar = document.getElementById('top-small');
+  if (!bar) return;
+  // ここで transform ベースのアニメーションを強制セット（CSS変更不要）
+  bar.style.willChange = 'transform';
+  bar.style.transition = bar.style.transition || 'transform 260ms ease, opacity 200ms ease';
+  bar.style.transform = 'translateY(-120%)';
+  bar.style.opacity = '0';
+  bar.dataset.visible = 'false';
+  // もう一度確実に画面外へ（初期化タイミングのズレ対策）
+  setTimeout(() => {
+    bar.style.transform = 'translateY(-120%)';
+    bar.style.opacity = '0';
+    bar.dataset.visible = 'false';
+  }, 10);
+}
+
 function setTopSmallVisible(visible) {
   const bar = document.getElementById('top-small');
   if (!bar) return;
-  const h = bar.offsetHeight || 60; // fallback
   if (visible) {
-    bar.style.top = '0';
+    bar.style.transform = 'translateY(0)';
+    bar.style.opacity = '1';
+    bar.dataset.visible = 'true';
   } else {
-    bar.style.top = `-${h}px`;
+    bar.style.transform = 'translateY(-120%)';
+    bar.style.opacity = '0';
+    bar.dataset.visible = 'false';
   }
 }
 
-// 入力値がURLぽいか判定（簡易）
+// URL 判定は元の looksLikeUrl を尊重（あればそちらを使ってください）
 function looksLikeUrl(s) {
   if (!s) return false;
   try {
-    // if it parses as URL with protocol, accept
     const u = new URL(s);
     return !!u.protocol;
   } catch (e) {
-    // no protocol: if it contains a dot and no spaces, treat as URL (e.g. example.com)
     return /\S+\.\S+/.test(s) && !/\s/.test(s);
   }
 }
 
-// 実際にプロキシ経由でページを読み込む（#content に HTML を入れる）
-// url は文字列（完全URLまたはホスト名など）
-async function loadSite(url) {
-  const content = document.getElementById('content');
-  if (!content) return;
-  proxiedActive = false; // 読み込み前は false（失敗時にトップバーが出ないよう）
+// loadSite は既存のものをそのまま使っている想定。
+// loadSite 完了時に proxiedActive = true に必ずする修正をここでラップしても良いです。
+// もしあなたの loadSite を上書きできるなら、下の wrapper を使ってください。
+
+async function wrappedLoadSite(url) {
+  // hide bar until load finished
+  proxiedActive = false;
   setTopSmallVisible(false);
 
-  // 非URLなら Google 検索クエリに変換（proxy 経由で検索ページを開く）
-  let target;
-  if (looksLikeUrl(url)) {
-    // 補完：スキームがないなら https:// を付ける
-    if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(url)) {
-      target = 'https://' + url;
-    } else {
-      target = url;
+  // call your existing loadSite implementation (assumed present).
+  // If your original function is named loadSite, call it; otherwise adapt.
+  if (typeof loadSiteOriginal === 'function') {
+    try {
+      await loadSiteOriginal(url); // ← あなたの既存 loadSite を別名で保持しておく想定
+      // 読み込み成功
+      proxiedActive = true;
+      // 小バーの入力欄に現在の URL を入れておく（ユーザビリティ向上）
+      try {
+        const smallInput = document.querySelector('#top-small input');
+        let resolved = url;
+        if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(url) && looksLikeUrl(url)) resolved = 'https://' + url;
+        if (!looksLikeUrl(url)) {
+          // 検索クエリだった場合は Google 検索の URL を入れる（任意）
+          resolved = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
+        }
+        if (smallInput) smallInput.value = resolved;
+      } catch (e) {}
+    } catch (e) {
+      proxiedActive = false;
+      throw e;
     }
   } else {
-    // Google 検索（プロキシ経由）
-    const q = encodeURIComponent(url);
-    target = `https://www.google.com/search?q=${q}`;
-  }
-
-  try {
-    const res = await fetch(`/proxy?url=${encodeURIComponent(target)}`);
-    if (!res.ok) throw new Error('HTTP error! status: ' + res.status);
-    const html = await res.text();
-
-    // 中身を差し替え
-    content.innerHTML = html;
-
-    // 読み込み成功 → プロキシ表示モードに切替
-    proxiedActive = true;
-
-    // 最初はカーソル待ち（すぐ表示させたくなければ false のまま）
-    // setTopSmallVisible(true); // 即表示したければ有効化
-  } catch (err) {
-    console.error('Client fetch error:', err);
-    content.innerHTML = `<div style="padding:24px;color:#900">読み込みに失敗しました：${String(err).replace(/</g,'&lt;')}</div>`;
-    proxiedActive = false;
-    setTopSmallVisible(false);
+    // fallback: if original not present, call your loadSite directly
+    if (typeof loadSite === 'function') {
+      await loadSite(url);
+      proxiedActive = true;
+    } else {
+      console.error('wrappedLoadSite: no loadSiteOriginal or loadSite function found.');
+    }
   }
 }
 
-// --- トップ（大）と小バーの GO / Enter 処理をバインド ---
-// 既存のUIに合わせて input 要素のセレクタを変えてください。
-// (#top-large input) はトップページの大きい検索、 (#top-small input) は小バーの入力。
-
+// --- イベントワイヤリング（セレクタは index.html に合わせてあります） ---
 function wireSearchBoxes() {
   const largeInput = document.querySelector('#top-large input');
   const largeButton = document.querySelector('#top-large button');
   const smallInput = document.querySelector('#top-small input');
   const smallButton = document.querySelector('#top-small button');
 
+  // GO ボタンは必ず右横で高さを揃えることは HTML/CSS 側で担保されています。
   if (largeButton) {
     largeButton.addEventListener('click', () => {
       const v = (largeInput && largeInput.value) ? largeInput.value.trim() : '';
-      if (v) loadSite(v);
+      if (!v) return;
+      // use wrappedLoadSite so proxiedActive is handled
+      wrappedLoadSite(v).catch(err => {
+        console.error('load error', err);
+        const content = document.getElementById('content');
+        if (content) content.innerHTML = `<div style="padding:24px;color:#900">読み込みに失敗しました：${String(err).replace(/</g,'&lt;')}</div>`;
+      });
     });
   }
   if (largeInput) {
     largeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const v = largeInput.value.trim();
-        if (v) loadSite(v);
+        if (v) {
+          wrappedLoadSite(v).catch(err => console.error(err));
+        }
       }
     });
   }
@@ -103,69 +127,68 @@ function wireSearchBoxes() {
   if (smallButton) {
     smallButton.addEventListener('click', () => {
       const v = (smallInput && smallInput.value) ? smallInput.value.trim() : '';
-      if (v) loadSite(v);
+      if (v) wrappedLoadSite(v).catch(err => console.error(err));
     });
   }
   if (smallInput) {
     smallInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const v = smallInput.value.trim();
-        if (v) loadSite(v);
+        if (v) wrappedLoadSite(v).catch(err => console.error(err));
       }
     });
   }
 }
 
-// --- マウス / タッチで上部に来たら表示、離れたら隠す ---
-// proxiedActive が true のときだけ反応（トップページでは出ない）
+// 上部での自動表示（proxiedActive === true のときのみ反応）
 function wireTopBarAutoShow() {
+  const pointerHandler = (clientY) => {
+    if (!proxiedActive) return;
+    if (clientY <= SHOW_THRESHOLD) {
+      clearTimeout(hideTimer);
+      clearTimeout(showDebounce);
+      // 少しデバウンスして表示（急な誤検出を抑える）
+      showDebounce = setTimeout(() => setTopSmallVisible(true), 10);
+    } else {
+      clearTimeout(showDebounce);
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setTopSmallVisible(false), HIDE_DELAY);
+    }
+  };
+
   document.addEventListener('mousemove', (e) => {
-    if (!proxiedActive) return;
-    if (e.clientY <= 40) {
-      // すぐ表示
-      clearTimeout(hideTimer);
-      setTopSmallVisible(true);
-    } else {
-      // 少し時間を置いて隠す（誤検知を防ぐ）
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => setTopSmallVisible(false), 700);
-    }
+    pointerHandler(e.clientY);
   });
 
-  // タッチ端末向け（画面上端タップで表示）
   document.addEventListener('touchstart', (e) => {
-    if (!proxiedActive) return;
-    const y = e.touches && e.touches[0] ? e.touches[0].clientY : 9999;
-    if (y <= 40) {
-      setTopSmallVisible(true);
-    } else {
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => setTopSmallVisible(false), 700);
-    }
+    const y = (e.touches && e.touches[0]) ? e.touches[0].clientY : 9999;
+    pointerHandler(y);
   });
 
-  // マウスがウィンドウ外に行ったら隠す
+  // mouseleave: 画面外へ出たら隠す
   document.addEventListener('mouseleave', () => {
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => setTopSmallVisible(false), 300);
+    clearTimeout(showDebounce);
+    hideTimer = setTimeout(() => setTopSmallVisible(false), 200);
   });
 
-  // ウィンドウリサイズ時に隠す（高さ再計算）
+  // リサイズ・スクロール時は一旦隠す（安定化）
   window.addEventListener('resize', () => {
-    clearTimeout(hideTimer);
+    clearTimeout(showDebounce);
     hideTimer = setTimeout(() => setTopSmallVisible(false), 100);
+  });
+  window.addEventListener('scroll', () => {
+    // ユーザがスクロールしたら誤検知防止で一旦隠す
+    clearTimeout(showDebounce);
+    hideTimer = setTimeout(() => setTopSmallVisible(false), 150);
   });
 }
 
-// 初期化（ページ読み込み時）
+// 初期化
 document.addEventListener('DOMContentLoaded', () => {
-  // 最初は小バーを確実に隠す
-  setTimeout(() => setTopSmallVisible(false), 10);
-
-  // ボタン系と自動表示をワイヤー
+  ensureBarInit();
   wireSearchBoxes();
   wireTopBarAutoShow();
 
-  // 既定で何かを読み込む場合はここを呼ぶ（例：前は Amazon を開いていた）
-  // loadSite('https://www.amazon.co.jp/');
+  // 初回はトップページなので小バーは隠す（必ず）
+  setTimeout(() => setTopSmallVisible(false), 20);
 });
