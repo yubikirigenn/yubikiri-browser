@@ -1,6 +1,6 @@
 const express = require("express");
 const axios = require("axios").default;
-const { wrapper } = require("axios-cookiejar-support");
+require("axios-cookiejar-support").default(axios); // axiosを拡張
 const tough = require("tough-cookie");
 const cheerio = require("cheerio");
 const router = express.Router();
@@ -13,29 +13,31 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    // Cookie jar を作成
     const jar = new tough.CookieJar();
-    const client = wrapper(axios.create({ jar, withCredentials: true }));
 
-    const response = await client.get(targetUrl, {
+    const response = await axios.get(targetUrl, {
+      jar,
+      withCredentials: true,
       responseType: "arraybuffer",
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": targetUrl,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br"
-      }
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive"
+      },
+      maxRedirects: 5,
+      validateStatus: (status) => status < 500 // 4xxも返す
     });
 
     const contentType = response.headers["content-type"] || "";
 
     if (contentType.includes("text/html")) {
-      // HTML の場合、リンク書き換え
       const html = response.data.toString("utf-8");
       const $ = cheerio.load(html);
 
+      // img, link, script タグを書き換え
       $("img").each((_, el) => {
         const src = $(el).attr("src");
         if (src && !src.startsWith("data:")) {
@@ -60,7 +62,7 @@ router.get("/", async (req, res) => {
       res.set("Content-Type", "text/html");
       res.send($.html());
     } else {
-      // HTML以外のリソース
+      // HTML以外（CSS, JS, 画像など）
       res.set("Content-Type", contentType);
       res.send(response.data);
     }
