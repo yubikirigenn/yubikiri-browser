@@ -1,51 +1,130 @@
-const content = document.getElementById('content');
-const topLarge = document.getElementById('top-large');
-const topSmall = document.getElementById('top-small');
+// === script.js ===
 
-const bigInput = document.getElementById('big-input');
-const bigGo = document.getElementById('big-go');
+let proxiedActive = false; // プロキシで外部サイト表示中か
+let hideTimer = null;
 
-const smallInput = document.getElementById('small-input');
-const smallGo = document.getElementById('small-go');
+// --- トップバー表示/非表示 ---
+function setTopSmallVisible(visible) {
+  const bar = document.getElementById('top-small');
+  if (!bar) return;
+  const h = bar.offsetHeight || 60;
+  bar.style.transition = 'top 0.3s ease';
+  bar.style.top = visible ? '0' : `-${h}px`;
+}
 
-// サイトを表示する関数
-async function loadSite(url) {
-  if (!url) return;
-
+// --- URLっぽいか判定 ---
+function looksLikeUrl(s) {
+  if (!s) return false;
   try {
-    const res = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
-    const html = await res.text();
-    content.innerHTML = html;
-
-    // トップページの大きなフォームを隠す
-    topLarge.style.display = 'none';
-
-    // 上部URLバーは画面外からスライドで表示される
-    topSmall.style.top = '-60px'; // 初期は隠す
-  } catch (err) {
-    content.innerHTML = `<p style="color:red;">読み込みエラー: ${err.message}</p>`;
+    const u = new URL(s);
+    return !!u.protocol;
+  } catch {
+    return /\S+\.\S+/.test(s) && !/\s/.test(s);
   }
 }
 
-// トップページの大きい検索バー
-bigGo.addEventListener('click', () => loadSite(bigInput.value));
-bigInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') loadSite(bigInput.value);
-});
+// --- サイト読み込み ---
+async function loadSite(url) {
+  const content = document.getElementById('content');
+  if (!content) return;
 
-// 上部URLバー（サイト表示中）
-smallGo.addEventListener('click', () => loadSite(smallInput.value));
-smallInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') loadSite(smallInput.value);
-});
+  proxiedActive = false;
+  setTopSmallVisible(false);
 
-// マウスカーソルが上に来たら小さなバーをスライドで表示
-document.addEventListener('mousemove', e => {
-  if (content.innerHTML !== '') {
-    if (e.clientY < 50) {
-      topSmall.style.top = '0';
-    } else if (e.clientY > 80) {
-      topSmall.style.top = '-60px';
-    }
+  let target;
+  if (looksLikeUrl(url)) {
+    target = /^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(url) ? url : 'https://' + url;
+  } else {
+    target = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
   }
+
+  try {
+    const res = await fetch(`/proxy?url=${encodeURIComponent(target)}`);
+    if (!res.ok) throw new Error('HTTP status ' + res.status);
+    const html = await res.text();
+
+    content.innerHTML = html;
+    proxiedActive = true;
+  } catch (err) {
+    console.error('Client fetch error:', err);
+    content.innerHTML = `<div style="padding:24px;color:#900">読み込みに失敗しました：${String(err).replace(/</g,'&lt;')}</div>`;
+    proxiedActive = false;
+    setTopSmallVisible(false);
+  }
+}
+
+// --- 入力ボックスのイベント設定 ---
+function wireSearchBoxes() {
+  const largeInput = document.querySelector('#top-large input');
+  const largeButton = document.querySelector('#top-large button');
+  const smallInput = document.querySelector('#top-small input');
+  const smallButton = document.querySelector('#top-small button');
+
+  if (largeButton && largeInput) {
+    largeButton.addEventListener('click', () => {
+      const v = largeInput.value.trim();
+      if (v) loadSite(v);
+    });
+    largeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const v = largeInput.value.trim();
+        if (v) loadSite(v);
+      }
+    });
+  }
+
+  if (smallButton && smallInput) {
+    smallButton.addEventListener('click', () => {
+      const v = smallInput.value.trim();
+      if (v) loadSite(v);
+    });
+    smallInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const v = smallInput.value.trim();
+        if (v) loadSite(v);
+      }
+    });
+  }
+}
+
+// --- 上部バー自動表示 ---
+function wireTopBarAutoShow() {
+  document.addEventListener('mousemove', (e) => {
+    if (!proxiedActive) return;
+    if (e.clientY <= 40) {
+      clearTimeout(hideTimer);
+      setTopSmallVisible(true);
+    } else {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setTopSmallVisible(false), 700);
+    }
+  });
+
+  document.addEventListener('touchstart', (e) => {
+    if (!proxiedActive) return;
+    const y = e.touches?.[0]?.clientY || 9999;
+    if (y <= 40) {
+      setTopSmallVisible(true);
+    } else {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setTopSmallVisible(false), 700);
+    }
+  });
+
+  document.addEventListener('mouseleave', () => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => setTopSmallVisible(false), 300);
+  });
+
+  window.addEventListener('resize', () => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => setTopSmallVisible(false), 100);
+  });
+}
+
+// --- 初期化 ---
+document.addEventListener('DOMContentLoaded', () => {
+  setTopSmallVisible(false);
+  wireSearchBoxes();
+  wireTopBarAutoShow();
 });
