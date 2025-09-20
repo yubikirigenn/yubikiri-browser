@@ -44,7 +44,6 @@ async function loadSite(inputValue) {
     // hide top-large immediately to avoid overlaying
     if (topLarge) topLarge.style.display = 'none';
 
-    content.innerHTML = `<div style="padding:24px;font-size:18px;color:#555">Loading…</div>`;
 
     const res = await fetch(`/proxy?url=${encodeURIComponent(target)}`);
     if (!res.ok) throw new Error('HTTP error! status: ' + res.status);
