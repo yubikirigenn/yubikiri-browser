@@ -1,5 +1,4 @@
 // public/script.js
-
 let proxiedActive = false;
 let hideTimer = null;
 
@@ -29,6 +28,7 @@ async function loadSite(inputValue) {
   proxiedActive = false;
   setTopSmallVisible(false);
 
+  // decide target (URL or google search)
   let target;
   if (looksLikeUrl(inputValue)) {
     if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(inputValue)) {
@@ -41,24 +41,24 @@ async function loadSite(inputValue) {
   }
 
   try {
-    // hide top-large immediately to avoid overlaying
+    // hide top-large to avoid overlay
     if (topLarge) topLarge.style.display = 'none';
 
-   content.innerHTML = `<div style="padding:24px;font-size:18px;color:#555">Loading…</div>`;
-
+    // show inline loading (centered) rather than persistent left-loading
+    content.innerHTML = `<div style="padding:24px;font-size:18px;color:#999;text-align:center">Loading…</div>`;
 
     const res = await fetch(`/proxy?url=${encodeURIComponent(target)}`);
     if (!res.ok) throw new Error('HTTP error! status: ' + res.status);
     const html = await res.text();
 
-    // inject HTML
+    // inject fetched HTML
     content.innerHTML = html;
 
-    proxiedActive = true;
-
-    // put the small input value to reflect the loaded URL
+    // reflect URL into small bar
     const smallInput = document.getElementById('small-input');
     if (smallInput) smallInput.value = target;
+
+    proxiedActive = true;
   } catch (err) {
     console.error('Client fetch error:', err);
     content.innerHTML = `<div style="padding:24px;color:#900">読み込みに失敗しました：${String(err).replace(/</g,'&lt;')}</div>`;
@@ -74,27 +74,36 @@ function wireSearchBoxes() {
   const smallInput = document.getElementById('small-input');
   const smallButton = document.getElementById('small-go');
 
-  if (largeButton) largeButton.addEventListener('click', () => {
-    const v = (largeInput && largeInput.value) ? largeInput.value.trim() : '';
-    if (v) loadSite(v);
-  });
-  if (largeInput) largeInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const v = largeInput.value.trim();
+  // defensive checks — if any are missing, do nothing but don't throw
+  if (largeButton) {
+    largeButton.addEventListener('click', () => {
+      const v = largeInput && largeInput.value ? largeInput.value.trim() : '';
       if (v) loadSite(v);
-    }
-  });
+    });
+  }
+  if (largeInput) {
+    largeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const v = largeInput.value.trim();
+        if (v) loadSite(v);
+      }
+    });
+  }
 
-  if (smallButton) smallButton.addEventListener('click', () => {
-    const v = (smallInput && smallInput.value) ? smallInput.value.trim() : '';
-    if (v) loadSite(v);
-  });
-  if (smallInput) smallInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const v = smallInput.value.trim();
+  if (smallButton) {
+    smallButton.addEventListener('click', () => {
+      const v = smallInput && smallInput.value ? smallInput.value.trim() : '';
       if (v) loadSite(v);
-    }
-  });
+    });
+  }
+  if (smallInput) {
+    smallInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const v = smallInput.value.trim();
+        if (v) loadSite(v);
+      }
+    });
+  }
 }
 
 function wireTopBarAutoShow() {
@@ -131,11 +140,18 @@ function wireTopBarAutoShow() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // hide small bar initially
+  // ensure small bar is hidden at start
   setTimeout(() => setTopSmallVisible(false), 10);
+
   wireSearchBoxes();
   wireTopBarAutoShow();
 
-  // optional: load default site (commented out if you want blank start)
-  // loadSite('https://www.amazon.co.jp/');
+  // remove any leftover manual "Loading" text (some previous code inserted it)
+  const content = document.getElementById('content');
+  if (content && content.textContent && content.textContent.trim().toLowerCase().includes('loading')) {
+    content.innerHTML = '';
+  }
+
+  // do NOT auto-load anything here (preserve your current behavior)
+  // if you want a default site, call loadSite('https://www.amazon.co.jp/') here.
 });
