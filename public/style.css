@@ -150,3 +150,12 @@ body {
 #content {
   margin-top: 20px;
 }
+.version-label {
+  position: fixed;
+  bottom: 6px;
+  right: 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.25); /* 黒背景なら白っぽく、白背景ならグレーっぽく */
+  pointer-events: none;       /* クリック操作に干渉しない */
+  user-select: none;          /* 選択できない */
+}
