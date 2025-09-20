@@ -152,10 +152,10 @@ body {
 }
 .version-label {
   position: fixed;
-  bottom: 6px;
-  right: 10px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.25); /* 黒背景なら白っぽく、白背景ならグレーっぽく */
-  pointer-events: none;       /* クリック操作に干渉しない */
-  user-select: none;          /* 選択できない */
+  bottom: 10px;
+  right: 14px;
+  font-size: 14px;              /* 少し大きめ */
+  color: rgba(238, 238, 238, 0.5); /* #eeeをベースに薄く */
+  pointer-events: none;
+  user-select: none;
 }
