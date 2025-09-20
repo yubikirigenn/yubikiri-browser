@@ -1,10 +1,13 @@
 body {
   margin: 0;
   font-family: sans-serif;
-  background: #222;
-  color: #eee;
+  background: #111; /* 黒ベース */
+  color: #ddd;
+  height: 100vh;
+  overflow: hidden;
 }
 
+/* 大きいトップ */
 #top-large {
   text-align: center;
   margin-top: 100px;
@@ -12,226 +15,79 @@ body {
 
 #top-large h1 {
   font-size: 64px;
-  margin-bottom: 40px;
-  color: #fff;
-  text-shadow: 0 3px 6px rgba(0,0,0,0.7);
+  margin-bottom: 24px;
+  color: #eee;
 }
 
-#top-large input {
-  width: 400px;
-  padding: 12px;
+/* search row */
+.search-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-row input {
+  width: 640px;
+  padding: 14px 16px;
   font-size: 18px;
-  border: 1px solid #666;
   border-radius: 8px;
-  background: linear-gradient(to bottom, #555, #333);
-  color: #fff;
-  box-shadow: inset 0 3px 6px rgba(0,0,0,0.7), 0 4px 8px rgba(0,0,0,0.5);
-  transition: all 0.2s ease;
-}
-
-#top-large input:focus {
-  border-color: #aaa;
-  box-shadow: inset 0 3px 8px rgba(0,0,0,0.8), 0 4px 8px rgba(0,0,0,0.5);
+  border: none;
   outline: none;
+  box-shadow:
+    inset 0 2px 6px rgba(255,255,255,0.03),
+    0 6px 18px rgba(0,0,0,0.6);
+  background: linear-gradient(#dcdcdc, #bfbfbf); /* 内側光沢の基礎 */
+  color: #111;
 }
 
-#top-large button {
-  padding: 12px 20px;
+/* GO ボタン：立体感 */
+.search-row button {
+  padding: 14px 22px;
   font-size: 18px;
-  border: 1px solid #999;
   border-radius: 8px;
-  background: linear-gradient(to bottom, #bbb, #888);
-  color: #222;
-  font-weight: bold;
-  box-shadow: 0 6px 0 #555, 0 8px 12px rgba(0,0,0,0.5);
+  border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
+  background: linear-gradient(#f6f6f6, #bfbfbf);
+  box-shadow: 0 6px 0 rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.4);
+  color: #111;
 }
 
-#top-large button::after {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border-radius: 8px;
-  background: linear-gradient(to top, rgba(255,255,255,0.3), rgba(255,255,255,0));
-  pointer-events: none;
-}
-
-#top-large button:hover {
-  background: linear-gradient(to bottom, #ccc, #999);
-  box-shadow: 0 4px 0 #444, 0 6px 10px rgba(0,0,0,0.5);
-  transform: translateY(1px);
-}
-
-#top-large button:active {
-  box-shadow: inset 0 4px 6px rgba(0,0,0,0.6);
-  transform: translateY(2px);
-}
-
+/* 小バー（トップにスライドする） */
 #top-small {
   position: fixed;
-  top: -60px;
+  top: -100px;
   left: 0;
   width: 100%;
+  padding: 10px 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  transition: top 0.3s ease;
-  z-index: 1000;
-  background: rgba(60, 60, 60, 0.85);
+  transition: top 0.28s ease;
+  z-index: 9999;
+  /* 透過・ぼかし（グレー系） */
+  background: rgba(40, 40, 40, 0.88);
   backdrop-filter: blur(6px);
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
 }
 
-#top-small input,
-#top-small button {
-  background: rgba(100, 100, 100, 0.9);
-  color: #fff;
-  border-radius: 8px;
-  border: 1px solid #888;
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.6), 0 3px 6px rgba(0,0,0,0.4);
+/* 小バー内部の input/button は高さ揃え */
+#top-small .search-row input,
+#top-small .search-row button {
+  height: 44px;
+  border-radius: 6px;
 }
 
-#top-small input:focus {
-  border-color: #aaa;
-  box-shadow: inset 0 3px 6px rgba(0,0,0,0.7), 0 3px 6px rgba(0,0,0,0.4);
-  outline: none;
-}
-
-#top-small button {
-  padding: 6px 14px;
-  font-size: 16px;
-  font-weight: bold;
-  border: 1px solid #aaa;
-  background: linear-gradient(to bottom, #888, #666);
-  box-shadow: 0 4px 0 #444, 0 5px 8px rgba(0,0,0,0.3);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-#top-small button::after {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border-radius: 8px;
-  background: linear-gradient(to top, rgba(255,255,255,0.25), rgba(255,255,255,0));
-  pointer-events: none;
-}
-
-#top-small button:hover {
-  background: linear-gradient(to bottom, #999, #777);
-  transform: translateY(1px);
-}
-
-#top-small button:active {
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
-  transform: translateY(2px);
-}
-
+/* content はウィンドウいっぱいに表示 */
 #content {
-  margin-top: 20px;
-}
-/* ------------------------- */
-/* 上部固定バーの入力欄を大きく & 内側光沢追加 */
-/* ------------------------- */
-#top-small input {
-  width: 70%;             /* 幅を60%→70%に拡大 */
-  padding: 10px 12px;     /* 高さを少し増加 */
-  font-size: 18px;        /* 文字サイズを大きく */
-  border-radius: 8px;
-  border: 1px solid #888;
-  background: linear-gradient(to bottom, #aaa, #666); /* グラデーションで内側光沢 */
-  color: #fff;
-  box-shadow: inset 0 2px 5px rgba(255,255,255,0.3), /* 内側光沢 */
-              inset 0 -2px 4px rgba(0,0,0,0.6),       /* 内側影 */
-              0 3px 6px rgba(0,0,0,0.4);             /* 外側影 */
-  transition: all 0.2s ease;
-}
-
-#top-small input:focus {
-  border-color: #ccc;
-  box-shadow: inset 0 3px 6px rgba(255,255,255,0.4),
-              inset 0 -3px 5px rgba(0,0,0,0.6),
-              0 3px 6px rgba(0,0,0,0.5);
-  outline: none;
-}
-/* ------------------------- */
-/* 上部固定バー：入力欄とGOボタンを同じ高さ・立体光沢に統一 */
-/* ------------------------- */
-#top-small input,
-#top-small button {
-  height: 44px;                     /* 高さを固定して統一 */
-  font-size: 18px;
-  border-radius: 8px;
-  border: 1px solid #888;
-  background: linear-gradient(to bottom, #aaa, #666); /* 内側光沢グラデ */
-  color: #fff;
-  box-shadow: inset 0 2px 5px rgba(255,255,255,0.3),
-              inset 0 -2px 4px rgba(0,0,0,0.6),
-              0 3px 6px rgba(0,0,0,0.4);
-  transition: all 0.2s ease;
-}
-
-/* フォーカス時の強調 */
-#top-small input:focus,
-#top-small button:focus {
-  border-color: #ccc;
-  box-shadow: inset 0 3px 6px rgba(255,255,255,0.4),
-              inset 0 -3px 5px rgba(0,0,0,0.6),
-              0 3px 6px rgba(0,0,0,0.5);
-  outline: none;
-}
-
-/* GOボタンの幅調整 */
-#top-small button {
-  padding: 0 20px; /* 横幅だけ調整、縦は高さで揃えているのでpaddingで変えない */
-  margin-left: 10px;
-  cursor: pointer;
-}
-#top-small {
-  position: fixed;
-  top: -80px; /* 元は -60px でしたが、トップページで完全に隠す */
+  position: absolute;
+  top: 0;
   left: 0;
-  width: 100%;
-  background: rgba(200, 200, 200, 0.85); /* 半透明グレー */
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid rgba(0,0,0,0.1);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  transition: top 0.3s ease;
-  z-index: 1000;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+  background: white;
+  color: black;
 }
-#top-small {
-  position: fixed;
-  top: -100px; /* 十分に画面外へ隠す */
-  left: 0;
-  width: 100%;
-  background: rgba(200, 200, 200, 0.85); /* 半透明グレー */
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid rgba(0,0,0,0.1);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  transition: top 0.3s ease;
-  z-index: 1000;
-}
-/* ------------------------- */
-/* 検索バーのサイズ安定化 */
-/* ------------------------- */
-#top-small input,
-#top-small button {
-  box-sizing: border-box; /* paddingとborderを含めてサイズ固定 */
-  line-height: normal;     /* 高さが不安定になるのを防ぐ */
-  min-height: 36px;        /* 最小高さを指定 */
-  max-height: 36px;        /* 最大高さを固定 */
-  vertical-align: middle;  /* ボタンやテキストと縦位置を揃える */
-}
+
+/* top-large が表示されているときは content は下に余白を作る */
+#top-large + #content { margin-top: 30px; }
