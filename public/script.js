@@ -1,11 +1,12 @@
 async function loadSite(url) {
   const content = document.getElementById('content');
-  const topLarge = document.getElementById('top-large');
+  const topLarge = document.getElementById('top-large'); // トップ画面
   if (!content) return;
 
   proxiedActive = false;
   setTopSmallVisible(false);
 
+  // 非URLなら Google 検索にする
   let target;
   if (looksLikeUrl(url)) {
     if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(url)) {
@@ -19,8 +20,9 @@ async function loadSite(url) {
   }
 
   try {
+    // トップ画面を確実に隠す
     if (topLarge) {
-      topLarge.style.display = "none"; // トップ画面を隠す
+      topLarge.style.display = "none";
     }
 
     content.innerHTML = `<div style="padding:24px;font-size:18px;color:#555">Loading…</div>`;
@@ -30,16 +32,16 @@ async function loadSite(url) {
     const html = await res.text();
 
     content.innerHTML = html;
-
     proxiedActive = true;
-
-    // ←ここに追加
-    setTopSmallVisible(false); // ページ読み込み完了後にバーを隠す
-
   } catch (err) {
     console.error('Client fetch error:', err);
     content.innerHTML = `<div style="padding:24px;color:#900">読み込みに失敗しました：${String(err).replace(/</g,'&lt;')}</div>`;
     proxiedActive = false;
+
+    // エラー時もトップ画面を隠す
+    if (topLarge) {
+      topLarge.style.display = "none";
+    }
     setTopSmallVisible(false);
   }
 }
