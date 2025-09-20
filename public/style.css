@@ -159,3 +159,23 @@ body {
               0 3px 6px rgba(0,0,0,0.5);
   outline: none;
 }
+/* ------------------------- */
+/* 上部バーをGOボタンの高さに揃えて幅を広げる */
+/* ------------------------- */
+#top-small {
+  height: 48px;               /* GOボタンの高さに合わせる */
+}
+
+#top-small input,
+#top-small button {
+  height: 36px;               /* GOボタンの高さに合わせる */
+  line-height: 36px;          /* テキストを中央に揃える */
+}
+
+#top-small input {
+  width: 75%;                 /* 横幅を少し広げる */
+}
+
+#top-small button {
+  padding: 0 16px;            /* ボタン内側の余白調整 */
+}
