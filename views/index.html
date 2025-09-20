@@ -10,18 +10,21 @@
   <div id="top-large">
     <h1>yubikiri-proxy</h1>
     <div class="search-row">
+      <!-- id を明示 (large-input / large-go) -->
       <input id="large-input" type="text" placeholder="URL または検索語を入力" />
       <button id="large-go">GO</button>
     </div>
   </div>
 
   <div id="top-small">
-    <div class="search-row">
+    <div class="search-row" style="width:90%; max-width:1200px; display:flex; gap:8px; align-items:center;">
+      <!-- id を明示 (small-input / small-go) -->
       <input id="small-input" type="text" placeholder="URL または検索語を入力" />
       <button id="small-go">GO</button>
     </div>
   </div>
 
+  <!-- content の初期は空にします（"Loading..." を消すため） -->
   <div id="content"></div>
 
   <script src="/script.js" defer></script>
