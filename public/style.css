@@ -159,43 +159,30 @@ body {
               0 3px 6px rgba(0,0,0,0.5);
   outline: none;
 }
-/* ------------------------- */
-/* 上部バーをGOボタンの高さに揃えて幅を広げる */
-/* ------------------------- */
+/* 上部固定バーの入力欄とGOボタンを横並びに揃える */
 #top-small {
-  height: 48px;               /* GOボタンの高さに合わせる */
-}
-
-#top-small input,
-#top-small button {
-  height: 36px;               /* GOボタンの高さに合わせる */
-  line-height: 36px;          /* テキストを中央に揃える */
-}
-
-#top-small input {
-  width: 75%;                 /* 横幅を少し広げる */
-}
-
-#top-small button {
-  padding: 0 16px;            /* ボタン内側の余白調整 */
-}
-/* ------------------------- */
-/* 上部バー：入力欄とGOボタン横並び調整 */
-/* ------------------------- */
-#top-small {
-  height: 48px;                 /* バーの高さ */
+  position: fixed;
+  top: -60px;
+  left: 0;
+  width: 100%;
   display: flex;
-  justify-content: center;       /* 中央寄せ */
-  align-items: center;           /* 縦中央揃え */
-  gap: 8px;                      /* 入力欄とボタンの間隔 */
-  padding: 0 12px;               /* 左右余白 */
+  justify-content: center;   /* 中央寄せ */
+  align-items: center;       /* 縦中央揃え */
+  padding: 6px 12px;
+  gap: 8px;                  /* 入力欄とボタンの間隔 */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: top 0.3s ease;
+  z-index: 1000;
+  background: rgba(60, 60, 60, 0.85);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  height: 48px;              /* 高さをGOボタンに合わせる */
   box-sizing: border-box;
 }
 
 #top-small input {
-  flex: 1;                       /* 残り幅を入力欄が使用 */
-  height: 36px;                   /* GOボタンに合わせる */
-  line-height: 36px;
+  flex: 1;                   /* 残り幅を入力欄が使用 */
+  height: 36px;               /* GOボタンと揃える */
   padding: 0 12px;
   font-size: 18px;
   border-radius: 8px;
@@ -217,8 +204,8 @@ body {
 }
 
 #top-small button {
-  height: 36px;                  /* 入力欄に合わせる */
-  padding: 0 16px;               /* 横の余白 */
+  height: 36px;              /* 入力欄と同じ高さ */
+  padding: 0 16px;
   font-size: 16px;
   font-weight: bold;
   border-radius: 8px;
@@ -228,8 +215,8 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
-  align-items: center;           /* 文字縦中央 */
-  justify-content: center;       /* 文字横中央 */
+  align-items: center;
+  justify-content: center;
 }
 
 #top-small button::after {
