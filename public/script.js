@@ -43,6 +43,7 @@ async function loadSite(inputValue) {
   try {
     // hide top-large immediately to avoid overlaying
     if (topLarge) topLarge.style.display = 'none';
+content.innerHTML = '';
 
 
     const res = await fetch(`/proxy?url=${encodeURIComponent(target)}`);
